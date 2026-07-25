@@ -1,3 +1,32 @@
+-- Quien registra una paca no manda el código -- se arma solo:
+-- {codigo_material}-{fecha YYYYMMDD}-{correlativo del día para ese material}.
+-- Ej. segunda paca de Cartón registrada el 2026-07-25: CART-20260725-02.
+CREATE OR REPLACE FUNCTION generar_codigo_paca()
+RETURNS TRIGGER AS $$
+DECLARE
+    codigo_mat  VARCHAR(30);
+    correlativo INTEGER;
+BEGIN
+    SELECT codigo INTO codigo_mat FROM materiales WHERE id = NEW.material_id;
+
+    SELECT count(*) + 1 INTO correlativo
+    FROM pacas
+    WHERE material_id = NEW.material_id
+      AND fecha_registro::date = CURRENT_DATE;
+
+    NEW.codigo := codigo_mat || '-' || to_char(now(), 'YYYYMMDD') || '-' || lpad(correlativo::text, 2, '0');
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_generar_codigo_paca ON pacas;
+
+CREATE TRIGGER trg_generar_codigo_paca
+    BEFORE INSERT ON pacas
+    FOR EACH ROW
+    EXECUTE FUNCTION generar_codigo_paca();
+
 -- No se puede registrar una paca de un material dado de baja (activo =
 -- false) -- mismo principio que en detalle_entrada/detalle_salida.
 CREATE OR REPLACE FUNCTION validar_material_activo_paca()

@@ -2,11 +2,17 @@
 -- material suelto). detalle_salida_id amarra la paca a la venta exacta en
 -- la que salió -- necesario para saber cuáles pacas se vendieron, no solo
 -- cuántas.
+--
+-- codigo NO lo manda quien registra la paca -- lo arma un trigger (ver
+-- triggers.sql) a partir del código del material + fecha + correlativo del
+-- día, así que aquí solo se declara NOT NULL UNIQUE como cualquier columna
+-- ya resuelta al momento del INSERT.
 
 CREATE TABLE IF NOT EXISTS pacas (
     id                SERIAL PRIMARY KEY,
     codigo            VARCHAR(30) NOT NULL UNIQUE,
     material_id       INTEGER NOT NULL REFERENCES materiales(id),
+    peso              NUMERIC(10, 2) NOT NULL CHECK (peso > 0),
     en_inventario     BOOLEAN NOT NULL DEFAULT true,
     fecha_registro    TIMESTAMPTZ NOT NULL DEFAULT now(),
     detalle_salida_id INTEGER REFERENCES detalle_salida(id),

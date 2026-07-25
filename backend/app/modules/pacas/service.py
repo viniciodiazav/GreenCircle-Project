@@ -34,7 +34,7 @@ async def registrar_paca(data: PacaCreate, db: AsyncSession) -> Paca:
     if not material.activo:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El material está inactivo")
 
-    paca = Paca(codigo=data.codigo, material_id=data.material_id)
+    paca = Paca(material_id=data.material_id, peso=data.peso)
     db.add(paca)
     try:
         await db.commit()
@@ -42,7 +42,7 @@ async def registrar_paca(data: PacaCreate, db: AsyncSession) -> Paca:
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Ya existe una paca con ese código",
+            detail="No se pudo generar un código único para la paca, intenta de nuevo",
         )
     await db.refresh(paca)
     return paca

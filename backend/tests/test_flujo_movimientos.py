@@ -18,6 +18,11 @@ async def _crear_movimiento(client, tipo):
     return resp.json()["id"]
 
 
+async def _crear_paca(client, material_id, peso=10):
+    resp = await client.post("/pacas", json={"material_id": material_id, "peso": peso})
+    return resp.json()
+
+
 async def test_movimiento_tipo_invalido_422(client):
     resp = await client.post("/movimientos", json={"tipo": "OTRO"})
     assert resp.status_code == 422
@@ -172,22 +177,35 @@ async def test_entrada_sincroniza_inventario_e_historial_kg(client):
     assert filas[0]["peso_nuevo"] == 70.0
 
 
-async def test_registrar_paca_y_codigo_duplicado(client):
-    material_id = await _crear_material(client, "Material Paca A")
+async def test_registrar_paca_genera_codigo_y_correlativo(client):
+    material = await client.post(
+        "/materiales", json={"nombre": "Materialcodigopaca", "precio_actual": 1.0}
+    )
+    material_data = material.json()
+    material_id = material_data["id"]
+    codigo_material = material_data["codigo"]
 
-    r1 = await client.post("/pacas", json={"codigo": "PACA-TEST-A", "material_id": material_id})
-    assert r1.status_code == 201
-    assert r1.json()["en_inventario"] is True
-    assert r1.json()["detalle_salida_id"] is None
+    r1 = await _crear_paca(client, material_id, peso=15.5)
+    assert r1["en_inventario"] is True
+    assert r1["detalle_salida_id"] is None
+    assert r1["peso"] == 15.5
 
-    r2 = await client.post("/pacas", json={"codigo": "PACA-TEST-A", "material_id": material_id})
-    assert r2.status_code == 409
+    fecha = r1["fecha_registro"][:10].replace("-", "")
+    assert r1["codigo"] == f"{codigo_material}-{fecha}-01"
+
+    r2 = await _crear_paca(client, material_id, peso=8)
+    assert r2["codigo"] == f"{codigo_material}-{fecha}-02"
+
+
+async def test_registrar_paca_peso_invalido_422(client):
+    material_id = await _crear_material(client, "Material Paca Peso Malo")
+    resp = await client.post("/pacas", json={"material_id": material_id, "peso": 0})
+    assert resp.status_code == 422
 
 
 async def test_historial_pacas_registra_alta(client):
     material_id = await _crear_material(client, "Material Paca B")
-    paca = await client.post("/pacas", json={"codigo": "PACA-TEST-B", "material_id": material_id})
-    paca_id = paca.json()["id"]
+    paca_id = (await _crear_paca(client, material_id))["id"]
 
     historial = await client.get("/historial-pacas", params={"paca_id": paca_id})
     filas = historial.json()
@@ -199,8 +217,7 @@ async def test_historial_pacas_registra_alta(client):
 async def test_venta_completa_actualiza_todo(client):
     material_id = await _crear_material(client, "Material Venta A")
     cliente_id = await _crear_cliente(client, "Cliente Venta A")
-    paca = await client.post("/pacas", json={"codigo": "PACA-VENTA-A", "material_id": material_id})
-    paca_id = paca.json()["id"]
+    paca_id = (await _crear_paca(client, material_id))["id"]
     movimiento_id = await _crear_movimiento(client, "SALIDA")
 
     resp = await client.post(
@@ -235,8 +252,7 @@ async def test_venta_completa_actualiza_todo(client):
 async def test_vender_paca_ya_vendida_409(client):
     material_id = await _crear_material(client, "Material Venta B")
     cliente_id = await _crear_cliente(client, "Cliente Venta B")
-    paca = await client.post("/pacas", json={"codigo": "PACA-VENTA-B", "material_id": material_id})
-    paca_id = paca.json()["id"]
+    paca_id = (await _crear_paca(client, material_id))["id"]
     movimiento_id = await _crear_movimiento(client, "SALIDA")
 
     primera = await client.post(
@@ -281,8 +297,7 @@ async def test_vender_paca_inexistente_404(client):
 async def test_vender_en_movimiento_tipo_incorrecto_409(client):
     material_id = await _crear_material(client, "Material Venta D")
     cliente_id = await _crear_cliente(client, "Cliente Venta D")
-    paca = await client.post("/pacas", json={"codigo": "PACA-VENTA-D", "material_id": material_id})
-    paca_id = paca.json()["id"]
+    paca_id = (await _crear_paca(client, material_id))["id"]
     movimiento_id = await _crear_movimiento(client, "ENTRADA")
 
     resp = await client.post(
@@ -299,8 +314,7 @@ async def test_vender_en_movimiento_tipo_incorrecto_409(client):
 
 async def test_vender_cliente_invalido_400(client):
     material_id = await _crear_material(client, "Material Venta E")
-    paca = await client.post("/pacas", json={"codigo": "PACA-VENTA-E", "material_id": material_id})
-    paca_id = paca.json()["id"]
+    paca_id = (await _crear_paca(client, material_id))["id"]
     movimiento_id = await _crear_movimiento(client, "SALIDA")
 
     resp = await client.post(
@@ -376,10 +390,7 @@ async def test_detalle_salida_cliente_inactivo_409(client):
     material_id = await _crear_material(client, "Material Flujo Cli Inactivo")
     cliente_id = await _crear_cliente(client, "Cliente Inactivo Flujo")
     await client.patch(f"/clientes/{cliente_id}", json={"activo": False})
-    paca = await client.post(
-        "/pacas", json={"codigo": "PACA-CLI-INACTIVO", "material_id": material_id}
-    )
-    paca_id = paca.json()["id"]
+    paca_id = (await _crear_paca(client, material_id))["id"]
     movimiento_id = await _crear_movimiento(client, "SALIDA")
 
     resp = await client.post(
@@ -398,7 +409,5 @@ async def test_registrar_paca_material_inactivo_409(client):
     material_id = await _crear_material(client, "Material Inactivo Paca")
     await client.patch(f"/materiales/{material_id}", json={"activo": False})
 
-    resp = await client.post(
-        "/pacas", json={"codigo": "PACA-MAT-INACTIVO", "material_id": material_id}
-    )
+    resp = await client.post("/pacas", json={"material_id": material_id, "peso": 10})
     assert resp.status_code == 409

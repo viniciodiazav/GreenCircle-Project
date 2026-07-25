@@ -101,7 +101,7 @@ Nota: el historial de precios ya NO está aquí, se movió a `/historial-precios
 
 **Pacas** (sin auth por ahora):
 - `GET /pacas`, `GET /pacas?en_inventario=true`, `GET /pacas/{id}`.
-- `POST /pacas` — `{"codigo", "material_id"}`. Nace siempre `en_inventario: true`. 400 si `material_id` no existe, 409 si el código ya existe **o si el material está inactivo**.
+- `POST /pacas` — `{"material_id", "peso"}`. **`codigo` NO se manda** — lo arma un trigger de Postgres: `{codigo_material}-{fecha YYYYMMDD}-{correlativo del día para ese material}` (ej. `CART-20260725-01`, `CART-20260725-02`). `peso` es aproximado o real, no se distingue a nivel de esquema (solo debe ser > 0). Nace siempre `en_inventario: true`. 400 si `material_id` no existe, 422 si `peso <= 0`, 409 si el material está inactivo.
 
 **Regla de negocio (agregada 2026-07-25): ningún detalle/paca puede referenciar una entidad inactiva.** Validado en dos capas: la BD lo garantiza siempre (trigger `BEFORE INSERT`, ver `base-datos/{movimientos,pacas}/triggers.sql` — imposible saltárselo ni con un INSERT directo), y el backend valida antes para devolver un 409 con mensaje legible en vez de dejar burbujear la excepción cruda de Postgres.
 
