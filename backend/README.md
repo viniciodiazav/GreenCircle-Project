@@ -20,7 +20,8 @@ app/
     ├── inventario/        # solo lectura (proyección)
     ├── historial_precios/ # solo lectura, antes vivía anidado en materiales
     ├── historial_kg/      # solo lectura
-    └── historial_pacas/   # solo lectura
+    ├── historial_pacas/   # solo lectura
+    └── ajustes_inventario/ # correcciones manuales de inventario (merma, conteo físico)
 ```
 
 Cada módulo es un paquete autocontenido por dominio (no por tipo de archivo). El `router.py` solo define rutas HTTP y delega; toda la lógica de negocio vive en `service.py` (funciones pequeñas, una responsabilidad, reciben `db: AsyncSession` explícito, sin `Depends`). Los modelos importan `Base` desde `app.core.database`. Un módulo no importa modelos/servicios internos de otro módulo — si necesitan compartir algo, ese algo sube a `core`.
@@ -29,6 +30,8 @@ Cada módulo es un paquete autocontenido por dominio (no por tipo de archivo). E
 - `detalle_entrada/service.py` y `detalle_salida/service.py` importan `Movimiento` y `validar_movimiento_para_detalle(...)` de `movimientos/service.py` (evita duplicar la validación de tipo/cerrado en los dos).
 - `detalle_salida/service.py` importa `Paca` de `pacas/models.py`: vender pacas es, en una sola transacción, crear el `detalle_salida` y marcar esas pacas como vendidas — partirlo en dos módulos sin este import dejaría estados a medias posibles (paca "vendida" sin venta real, o viceversa).
 - `historial_pacas/service.py` importa `Paca` de `pacas/models.py` únicamente para poder filtrar por `material_id` (join). `historial_precios` e `historial_kg` no importan de nadie.
+- `pacas/service.py` importa `Inventario` de `inventario/models.py`: registrar una paca resta su peso del inventario suelto (ver abajo), así que hay que confirmar que haya suficiente antes de intentarlo.
+- `ajustes_inventario/service.py` importa `Material` de `materiales/models.py` solo para validar que `material_id` exista (mismo patrón que otros módulos).
 
 **Los tres módulos de historial (`historial_precios`, `historial_kg`, `historial_pacas`) son de solo lectura y 100% independientes entre sí y de los módulos que auditan** (`materiales`, `inventario`, `pacas`) — cada uno es su propio router top-level (`/historial-precios`, `/historial-kg`, `/historial-pacas`), no anidado bajo el recurso que audita. Los tres se llenan solos vía trigger de Postgres (nunca el backend escribe en ellos): `historial_precios` cuando cambia `materiales.precio_actual`, `historial_kg` cuando entra material por `detalle_entrada`, `historial_pacas` cuando una paca se registra (evento `ALTA`) o se vende (evento `VENTA`, ligado a su `detalle_salida_id`).
 
@@ -101,7 +104,7 @@ Nota: el historial de precios ya NO está aquí, se movió a `/historial-precios
 
 **Pacas** (sin auth por ahora):
 - `GET /pacas`, `GET /pacas?en_inventario=true`, `GET /pacas/{id}`.
-- `POST /pacas` — `{"material_id", "peso"}`. **`codigo` NO se manda** — lo arma un trigger de Postgres: `{codigo_material}-{fecha YYYYMMDD}-{correlativo del día para ese material}` (ej. `CART-20260725-01`, `CART-20260725-02`). `peso` es aproximado o real, no se distingue a nivel de esquema (solo debe ser > 0). Nace siempre `en_inventario: true`. 400 si `material_id` no existe, 422 si `peso <= 0`, 409 si el material está inactivo.
+- `POST /pacas` — `{"material_id", "peso"}`. **`codigo` NO se manda** — lo arma un trigger de Postgres: `{codigo_material}-{fecha YYYYMMDD}-{correlativo del día para ese material}` (ej. `CART-20260725-01`, `CART-20260725-02`). `peso` es aproximado o real, no se distingue a nivel de esquema (solo debe ser > 0). Nace siempre `en_inventario: true`. 400 si `material_id` no existe, 422 si `peso <= 0`, 409 si el material está inactivo, **409 si no hay suficiente inventario suelto de ese material** (ver abajo). **Registrar una paca resta su `peso` del inventario suelto** (`inventario.peso_total`) del material — se asume que ese material ya se compactó y dejó de estar "suelto".
 
 **Regla de negocio (agregada 2026-07-25): ningún detalle/paca puede referenciar una entidad inactiva.** Validado en dos capas: la BD lo garantiza siempre (trigger `BEFORE INSERT`, ver `base-datos/{movimientos,pacas}/triggers.sql` — imposible saltárselo ni con un INSERT directo), y el backend valida antes para devolver un 409 con mensaje legible en vez de dejar burbujear la excepción cruda de Postgres.
 
@@ -109,9 +112,14 @@ Nota: el historial de precios ya NO está aquí, se movió a `/historial-precios
 - `GET /inventario` — material suelto acumulado por `material_id` (`peso_total`).
 - `GET /inventario/pacas` — pacas actualmente en bodega por `material_id` (`cantidad`).
 
+**Ajustes de inventario** (agregado 2026-07-25, router propio `/ajustes-inventario`, sin auth por ahora): corrige discrepancias entre lo que dice la BD y un conteo físico real (merma por humedad, error de báscula, robo, etc.) — sin esto, `inventario.peso_total` solo puede crecer (entradas) o bajar por pacas registradas, nunca por una corrección manual.
+- `POST /ajustes-inventario` — `{"material_id", "peso_ajuste", "motivo", "comentarios"?}`. `peso_ajuste` es un **delta** (no un valor absoluto): negativo resta (merma), positivo suma (se encontró más de lo esperado). `motivo` es obligatorio (422 si viene vacío o falta), `comentarios` es libre y opcional. 400 si `material_id` no existe, 422 si `peso_ajuste == 0`, 409 si el ajuste dejaría `peso_total` en negativo.
+- `GET /ajustes-inventario`, `GET /ajustes-inventario?material_id=...`.
+- Cada ajuste también queda anotado en `/historial-kg` (mismo `peso_anterior`/`peso_nuevo` que un `detalle_entrada`) — una sola línea de tiempo con entradas, pacas y ajustes juntos.
+
 **Historiales** (los tres solo lectura, sin auth por ahora, routers independientes):
 - `GET /historial-precios`, `GET /historial-precios?material_id=...` — cada cambio de `precio_actual` (`precio_anterior`, `precio_nuevo`, `fecha_cambio`).
-- `GET /historial-kg`, `GET /historial-kg?material_id=...` — cada cambio al inventario de material suelto (`peso_anterior`, `peso_nuevo`, `fecha_cambio`), generado por cada `detalle_entrada`.
+- `GET /historial-kg`, `GET /historial-kg?material_id=...` — cada cambio al inventario de material suelto (`peso_anterior`, `peso_nuevo`, `fecha_cambio`): entradas (suma), pacas registradas (resta) y ajustes manuales (+/-), todos en la misma línea de tiempo.
 - `GET /historial-pacas`, `GET /historial-pacas?paca_id=...`, `GET /historial-pacas?material_id=...` — eventos de cada paca: `evento` (`ALTA` o `VENTA`), `detalle_salida_id` (solo en `VENTA`), `fecha`.
 
 ### Generación automática del código

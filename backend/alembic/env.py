@@ -8,6 +8,7 @@ from alembic import context
 
 from app.core.config import settings
 from app.core.database import Base
+from app.modules.ajustes_inventario.models import AjusteInventario  # noqa: F401
 from app.modules.auth.models import Admin  # noqa: F401  (registra metadata)
 from app.modules.clientes.models import Cliente  # noqa: F401
 from app.modules.detalle_entrada.models import DetalleEntrada  # noqa: F401

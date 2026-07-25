@@ -11,6 +11,12 @@ from app.modules.pacas.schemas import PacaCreate
 # base-datos/pacas/triggers.sql -- esto es solo para un 409 legible).
 from app.modules.materiales.models import Material
 
+# Cruce deliberado: registrar una paca resta su peso del inventario de
+# material suelto (ver base-datos/inventario/triggers.sql); se valida aquí
+# que haya suficiente antes de intentarlo, para un 409 legible en vez de
+# dejar que el CHECK (peso_total >= 0) de Postgres burbujee crudo.
+from app.modules.inventario.models import Inventario
+
 
 async def get_paca_or_404(paca_id: int, db: AsyncSession) -> Paca:
     paca = await db.get(Paca, paca_id)
@@ -33,6 +39,14 @@ async def registrar_paca(data: PacaCreate, db: AsyncSession) -> Paca:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="material_id no existe")
     if not material.activo:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El material está inactivo")
+
+    inventario = await db.get(Inventario, data.material_id)
+    peso_disponible = inventario.peso_total if inventario is not None else 0
+    if peso_disponible < data.peso:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Inventario insuficiente: hay {peso_disponible} kg registrados de este material",
+        )
 
     paca = Paca(material_id=data.material_id, peso=data.peso)
     db.add(paca)

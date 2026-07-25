@@ -18,7 +18,25 @@ async def _crear_movimiento(client, tipo):
     return resp.json()["id"]
 
 
+async def _agregar_inventario(client, material_id, peso):
+    """Registra una entrada con peso_neto == peso, para que haya inventario
+    suelto suficiente antes de compactar una paca de ese material."""
+    proveedor_id = await _crear_proveedor(client, "Proveedor Auto Inventario")
+    movimiento_id = await _crear_movimiento(client, "ENTRADA")
+    await client.post(
+        "/detalle-entrada",
+        json={
+            "movimiento_id": movimiento_id,
+            "proveedor_id": proveedor_id,
+            "material_id": material_id,
+            "peso_bruto": peso + 1,
+            "tara": 1,
+        },
+    )
+
+
 async def _crear_paca(client, material_id, peso=10):
+    await _agregar_inventario(client, material_id, peso)
     resp = await client.post("/pacas", json={"material_id": material_id, "peso": peso})
     return resp.json()
 
@@ -175,6 +193,34 @@ async def test_entrada_sincroniza_inventario_e_historial_kg(client):
     assert len(filas) == 1
     assert filas[0]["peso_anterior"] == 0.0
     assert filas[0]["peso_nuevo"] == 70.0
+
+
+async def test_registrar_paca_resta_inventario_y_registra_historial(client):
+    material_id = await _crear_material(client, "Material Resta Inventario")
+    await _agregar_inventario(client, material_id, peso=100)
+
+    inventario_antes = await client.get("/inventario")
+    fila_antes = next(f for f in inventario_antes.json() if f["material_id"] == material_id)
+    assert fila_antes["peso_total"] == 100.0
+
+    paca = await client.post("/pacas", json={"material_id": material_id, "peso": 30})
+    assert paca.status_code == 201
+
+    inventario_despues = await client.get("/inventario")
+    fila_despues = next(f for f in inventario_despues.json() if f["material_id"] == material_id)
+    assert fila_despues["peso_total"] == 70.0
+
+    historial = await client.get("/historial-kg", params={"material_id": material_id})
+    filas = sorted(historial.json(), key=lambda f: f["fecha_cambio"])
+    assert filas[-1]["peso_anterior"] == 100.0
+    assert filas[-1]["peso_nuevo"] == 70.0
+
+
+async def test_registrar_paca_inventario_insuficiente_409(client):
+    material_id = await _crear_material(client, "Material Sin Inventario")
+
+    resp = await client.post("/pacas", json={"material_id": material_id, "peso": 5})
+    assert resp.status_code == 409
 
 
 async def test_registrar_paca_genera_codigo_y_correlativo(client):

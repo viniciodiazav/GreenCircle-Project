@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.modules.ajustes_inventario.router import router as ajustes_inventario_router
 from app.modules.auth.router import router as auth_router
 from app.modules.clientes.router import router as clientes_router
 from app.modules.detalle_entrada.router import router as detalle_entrada_router
@@ -34,6 +35,7 @@ app.include_router(inventario_router)
 app.include_router(historial_precios_router)
 app.include_router(historial_kg_router)
 app.include_router(historial_pacas_router)
+app.include_router(ajustes_inventario_router)
 app.include_router(auth_router)
 
 
