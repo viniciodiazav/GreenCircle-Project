@@ -92,16 +92,18 @@ Nota: el historial de precios ya NO está aquí, se movió a `/historial-precios
 - `PATCH /movimientos/{id}/cerrar` — cierra el movimiento (409 si ya estaba cerrado). Un movimiento cerrado ya no acepta nuevos detalles (409, aplicado también en la BD vía trigger).
 
 **Detalle de entrada** (router y recurso propios, `/detalle-entrada`, sin auth por ahora):
-- `POST /detalle-entrada` — `{"movimiento_id", "proveedor_id", "material_id", "peso_bruto", "tara", "descripcion"?}`. 409 si el movimiento no es ENTRADA o ya está cerrado; 400 si `proveedor_id`/`material_id` no existen o `peso_bruto <= tara`. `peso_neto` y `precio_compra` (snapshot del precio de compra vigente) se calculan solos.
+- `POST /detalle-entrada` — `{"movimiento_id", "proveedor_id", "material_id", "peso_bruto", "tara", "descripcion"?}`. 409 si el movimiento no es ENTRADA o ya está cerrado; 400 si `proveedor_id`/`material_id` no existen; **409 si el proveedor o el material están inactivos** (`activo = false`); 400 si `peso_bruto <= tara`. `peso_neto` y `precio_compra` (snapshot del precio de compra vigente) se calculan solos.
 - `GET /detalle-entrada`, `GET /detalle-entrada?movimiento_id=...`, `GET /detalle-entrada/{id}`.
 
 **Detalle de salida** (router y recurso propios, `/detalle-salida`, sin auth por ahora):
-- `POST /detalle-salida` — `{"movimiento_id", "cliente_id", "precio_venta", "pacas": [id, id, ...], "descripcion"?}`. Esto vende esas pacas específicas: 409 si el movimiento no es SALIDA o ya está cerrado, 404 si alguna paca no existe, 409 si alguna ya estaba vendida, 400 si `cliente_id` no existe. `cantidad_pacas` en la respuesta es derivado (cuenta pacas ligadas), no una columna.
+- `POST /detalle-salida` — `{"movimiento_id", "cliente_id", "precio_venta", "pacas": [id, id, ...], "descripcion"?}`. Esto vende esas pacas específicas: 409 si el movimiento no es SALIDA o ya está cerrado, 400 si `cliente_id` no existe, **409 si el cliente está inactivo**, 404 si alguna paca no existe, 409 si alguna ya estaba vendida. `cantidad_pacas` en la respuesta es derivado (cuenta pacas ligadas), no una columna.
 - `GET /detalle-salida`, `GET /detalle-salida?movimiento_id=...`, `GET /detalle-salida/{id}`.
 
 **Pacas** (sin auth por ahora):
 - `GET /pacas`, `GET /pacas?en_inventario=true`, `GET /pacas/{id}`.
-- `POST /pacas` — `{"codigo", "material_id"}`. Nace siempre `en_inventario: true`. 409 si el código ya existe o `material_id` no existe.
+- `POST /pacas` — `{"codigo", "material_id"}`. Nace siempre `en_inventario: true`. 400 si `material_id` no existe, 409 si el código ya existe **o si el material está inactivo**.
+
+**Regla de negocio (agregada 2026-07-25): ningún detalle/paca puede referenciar una entidad inactiva.** Validado en dos capas: la BD lo garantiza siempre (trigger `BEFORE INSERT`, ver `base-datos/{movimientos,pacas}/triggers.sql` — imposible saltárselo ni con un INSERT directo), y el backend valida antes para devolver un 409 con mensaje legible en vez de dejar burbujear la excepción cruda de Postgres.
 
 **Inventario** (solo lectura, sin auth por ahora):
 - `GET /inventario` — material suelto acumulado por `material_id` (`peso_total`).

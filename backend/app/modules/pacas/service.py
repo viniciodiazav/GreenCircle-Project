@@ -6,6 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.pacas.models import Paca
 from app.modules.pacas.schemas import PacaCreate
 
+# Cruce deliberado: confirmar que el material siga activo antes de dejar
+# registrar la paca (la BD ya lo garantiza vía trigger -- ver
+# base-datos/pacas/triggers.sql -- esto es solo para un 409 legible).
+from app.modules.materiales.models import Material
+
 
 async def get_paca_or_404(paca_id: int, db: AsyncSession) -> Paca:
     paca = await db.get(Paca, paca_id)
@@ -23,6 +28,12 @@ async def listar_pacas(db: AsyncSession, en_inventario: bool | None = None) -> l
 
 
 async def registrar_paca(data: PacaCreate, db: AsyncSession) -> Paca:
+    material = await db.get(Material, data.material_id)
+    if material is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="material_id no existe")
+    if not material.activo:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El material está inactivo")
+
     paca = Paca(codigo=data.codigo, material_id=data.material_id)
     db.add(paca)
     try:
@@ -31,7 +42,7 @@ async def registrar_paca(data: PacaCreate, db: AsyncSession) -> Paca:
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Ya existe una paca con ese código, o material_id no existe",
+            detail="Ya existe una paca con ese código",
         )
     await db.refresh(paca)
     return paca

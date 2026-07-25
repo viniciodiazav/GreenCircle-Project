@@ -13,6 +13,13 @@ from app.modules.detalle_entrada.schemas import DetalleEntradaCreate
 from app.modules.movimientos.models import Movimiento
 from app.modules.movimientos.service import get_movimiento_or_404, validar_movimiento_para_detalle
 
+# Cruce deliberado: hay que confirmar que el proveedor y el material sigan
+# activos antes de dejar registrar la línea (la BD ya lo garantiza vía
+# trigger -- ver base-datos/movimientos/triggers.sql -- esto es solo para dar
+# un 409 legible en vez de dejar que la excepción cruda de Postgres burbujee).
+from app.modules.materiales.models import Material
+from app.modules.proveedores.models import Proveedor
+
 
 async def get_detalle_entrada_or_404(detalle_id: int, db: AsyncSession) -> DetalleEntrada:
     detalle = await db.get(DetalleEntrada, detalle_id)
@@ -33,6 +40,18 @@ async def agregar_detalle_entrada(data: DetalleEntradaCreate, db: AsyncSession) 
     movimiento: Movimiento = await get_movimiento_or_404(data.movimiento_id, db)
     validar_movimiento_para_detalle(movimiento, "ENTRADA")
 
+    proveedor = await db.get(Proveedor, data.proveedor_id)
+    if proveedor is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="proveedor_id no existe")
+    if not proveedor.activo:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El proveedor está inactivo")
+
+    material = await db.get(Material, data.material_id)
+    if material is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="material_id no existe")
+    if not material.activo:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El material está inactivo")
+
     detalle = DetalleEntrada(
         movimiento_id=data.movimiento_id,
         proveedor_id=data.proveedor_id,
@@ -48,7 +67,7 @@ async def agregar_detalle_entrada(data: DetalleEntradaCreate, db: AsyncSession) 
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="proveedor_id o material_id no existe, o peso_bruto <= tara",
+            detail="peso_bruto debe ser mayor que tara",
         )
     await db.refresh(detalle)
     return detalle

@@ -32,6 +32,15 @@ además crea `historial_pacas`, que también referencia `detalle_salida`.
 `schema.sql` incluye `historial_kg` y su `triggers.sql` lo llena desde el
 mismo trigger que sincroniza `inventario`.
 
+**Regla de negocio: un detalle no puede referenciar una entidad inactiva.**
+`movimientos/triggers.sql` bloquea (`RAISE EXCEPTION`) insertar un
+`detalle_entrada` con `proveedor_id`/`material_id` de un registro con
+`activo = false`, o un `detalle_salida` con `cliente_id` inactivo.
+`pacas/triggers.sql` hace lo mismo para `material_id` al registrar una paca.
+Por eso este orden importa: las columnas `activo` de `proveedores`,
+`clientes` y `materiales` deben existir antes de aplicar estos triggers
+(ya lo hacen, están en el `schema.sql` de cada uno).
+
 ## Cómo agregar un módulo nuevo (ej. `camiones`)
 
 1. Crear `base-datos/camiones/` con `schema.sql` (+ `triggers.sql`/`seed.sql` si aplica).

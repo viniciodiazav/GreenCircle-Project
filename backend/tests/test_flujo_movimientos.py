@@ -287,3 +287,73 @@ async def test_listar_movimientos_filtra_por_tipo(client):
     ids_entrada = [m["id"] for m in entradas.json()]
     assert entrada_id in ids_entrada
     assert salida_id not in ids_entrada
+
+
+async def test_detalle_entrada_proveedor_inactivo_409(client):
+    proveedor_id = await _crear_proveedor(client, "Proveedor Inactivo Flujo")
+    await client.patch(f"/proveedores/{proveedor_id}", json={"activo": False})
+    material_id = await _crear_material(client, "Material Flujo Prov Inactivo")
+    movimiento_id = await _crear_movimiento(client, "ENTRADA")
+
+    resp = await client.post(
+        "/detalle-entrada",
+        json={
+            "movimiento_id": movimiento_id,
+            "proveedor_id": proveedor_id,
+            "material_id": material_id,
+            "peso_bruto": 50,
+            "tara": 5,
+        },
+    )
+    assert resp.status_code == 409
+
+
+async def test_detalle_entrada_material_inactivo_409(client):
+    proveedor_id = await _crear_proveedor(client, "Proveedor Flujo Mat Inactivo")
+    material_id = await _crear_material(client, "Material Inactivo Flujo")
+    await client.patch(f"/materiales/{material_id}", json={"activo": False})
+    movimiento_id = await _crear_movimiento(client, "ENTRADA")
+
+    resp = await client.post(
+        "/detalle-entrada",
+        json={
+            "movimiento_id": movimiento_id,
+            "proveedor_id": proveedor_id,
+            "material_id": material_id,
+            "peso_bruto": 50,
+            "tara": 5,
+        },
+    )
+    assert resp.status_code == 409
+
+
+async def test_detalle_salida_cliente_inactivo_409(client):
+    material_id = await _crear_material(client, "Material Flujo Cli Inactivo")
+    cliente_id = await _crear_cliente(client, "Cliente Inactivo Flujo")
+    await client.patch(f"/clientes/{cliente_id}", json={"activo": False})
+    paca = await client.post(
+        "/pacas", json={"codigo": "PACA-CLI-INACTIVO", "material_id": material_id}
+    )
+    paca_id = paca.json()["id"]
+    movimiento_id = await _crear_movimiento(client, "SALIDA")
+
+    resp = await client.post(
+        "/detalle-salida",
+        json={
+            "movimiento_id": movimiento_id,
+            "cliente_id": cliente_id,
+            "precio_venta": 5.0,
+            "pacas": [paca_id],
+        },
+    )
+    assert resp.status_code == 409
+
+
+async def test_registrar_paca_material_inactivo_409(client):
+    material_id = await _crear_material(client, "Material Inactivo Paca")
+    await client.patch(f"/materiales/{material_id}", json={"activo": False})
+
+    resp = await client.post(
+        "/pacas", json={"codigo": "PACA-MAT-INACTIVO", "material_id": material_id}
+    )
+    assert resp.status_code == 409

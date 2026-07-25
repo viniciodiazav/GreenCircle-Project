@@ -1,6 +1,5 @@
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.detalle_salida.models import DetalleSalida
@@ -16,6 +15,11 @@ from app.modules.movimientos.service import get_movimiento_or_404, validar_movim
 # sin este import dejaría abierta la posibilidad de un detalle_salida sin
 # pacas o de pacas "vendidas" sin un detalle_salida real.
 from app.modules.pacas.models import Paca
+
+# Cruce deliberado: confirmar que el cliente siga activo antes de dejar
+# registrar la venta (la BD ya lo garantiza vía trigger -- ver
+# base-datos/movimientos/triggers.sql -- esto es solo para un 409 legible).
+from app.modules.clientes.models import Cliente
 
 
 async def get_detalle_salida_or_404(detalle_id: int, db: AsyncSession) -> tuple[DetalleSalida, int]:
@@ -50,6 +54,12 @@ async def agregar_detalle_salida(data: DetalleSalidaCreate, db: AsyncSession) ->
     movimiento: Movimiento = await get_movimiento_or_404(data.movimiento_id, db)
     validar_movimiento_para_detalle(movimiento, "SALIDA")
 
+    cliente = await db.get(Cliente, data.cliente_id)
+    if cliente is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="cliente_id no existe")
+    if not cliente.activo:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El cliente está inactivo")
+
     result = await db.execute(select(Paca).where(Paca.id.in_(data.pacas)))
     pacas = list(result.scalars().all())
 
@@ -74,11 +84,7 @@ async def agregar_detalle_salida(data: DetalleSalidaCreate, db: AsyncSession) ->
         descripcion=data.descripcion,
     )
     db.add(detalle)
-    try:
-        await db.flush()
-    except IntegrityError:
-        await db.rollback()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="cliente_id no existe")
+    await db.flush()
 
     for paca in pacas:
         paca.en_inventario = False

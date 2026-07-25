@@ -1,3 +1,25 @@
+-- No se puede registrar una paca de un material dado de baja (activo =
+-- false) -- mismo principio que en detalle_entrada/detalle_salida.
+CREATE OR REPLACE FUNCTION validar_material_activo_paca()
+RETURNS TRIGGER AS $$
+DECLARE
+    material_activo BOOLEAN;
+BEGIN
+    SELECT activo INTO material_activo FROM materiales WHERE id = NEW.material_id;
+    IF NOT material_activo THEN
+        RAISE EXCEPTION 'El material % está inactivo', NEW.material_id;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_validar_material_activo_paca ON pacas;
+
+CREATE TRIGGER trg_validar_material_activo_paca
+    BEFORE INSERT ON pacas
+    FOR EACH ROW
+    EXECUTE FUNCTION validar_material_activo_paca();
+
 -- Cada paca que se registra queda anotada en su historial como ALTA.
 CREATE OR REPLACE FUNCTION registrar_historial_paca_alta()
 RETURNS TRIGGER AS $$
