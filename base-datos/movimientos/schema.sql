@@ -23,10 +23,14 @@ CREATE TABLE IF NOT EXISTS detalle_entrada (
     material_id     INTEGER NOT NULL REFERENCES materiales(id),
     peso_bruto      NUMERIC(10, 2) NOT NULL CHECK (peso_bruto > 0),
     tara            NUMERIC(10, 2) NOT NULL CHECK (tara >= 0),
-    peso_neto       NUMERIC(10, 2) GENERATED ALWAYS AS (peso_bruto - tara) STORED,
+    descuento       NUMERIC(5, 2) NOT NULL DEFAULT 0 CHECK (descuento >= 0 AND descuento <= 100),
+    -- Se aplica sobre el neto ya calculado (peso_bruto - tara), no sobre el
+    -- bruto -- ej. merma por humedad/impurezas detectada al pesar.
+    peso_neto       NUMERIC(10, 2) GENERATED ALWAYS AS ((peso_bruto - tara) * (1 - descuento / 100)) STORED,
     precio_compra   NUMERIC(10, 2) NOT NULL CHECK (precio_compra > 0),
     fecha           TIMESTAMPTZ NOT NULL DEFAULT now(),
     descripcion     TEXT,
+    descripcion_descuento TEXT,
     CHECK (peso_bruto > tara),
     FOREIGN KEY (movimiento_id, tipo_movimiento) REFERENCES movimientos (id, tipo)
 );

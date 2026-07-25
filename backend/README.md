@@ -92,7 +92,7 @@ Nota: el historial de precios ya NO está aquí, se movió a `/historial-precios
 - `PATCH /movimientos/{id}/cerrar` — cierra el movimiento (409 si ya estaba cerrado). Un movimiento cerrado ya no acepta nuevos detalles (409, aplicado también en la BD vía trigger).
 
 **Detalle de entrada** (router y recurso propios, `/detalle-entrada`, sin auth por ahora):
-- `POST /detalle-entrada` — `{"movimiento_id", "proveedor_id", "material_id", "peso_bruto", "tara", "descripcion"?}`. 409 si el movimiento no es ENTRADA o ya está cerrado; 400 si `proveedor_id`/`material_id` no existen; **409 si el proveedor o el material están inactivos** (`activo = false`); 400 si `peso_bruto <= tara`. `peso_neto` y `precio_compra` (snapshot del precio de compra vigente) se calculan solos.
+- `POST /detalle-entrada` — `{"movimiento_id", "proveedor_id", "material_id", "peso_bruto", "tara", "descuento"?, "descripcion"?, "descripcion_descuento"?}`. 409 si el movimiento no es ENTRADA o ya está cerrado; 400 si `proveedor_id`/`material_id` no existen; **409 si el proveedor o el material están inactivos** (`activo = false`); 400 si `peso_bruto <= tara`; 422 si `descuento` no está entre 0 y 100. `descuento` es opcional (default 0, porcentaje). `peso_neto` y `precio_compra` (snapshot del precio de compra vigente) se calculan solos: `peso_neto = (peso_bruto - tara) * (1 - descuento / 100)` — el descuento se aplica sobre el neto ya calculado, no sobre el bruto (ej. merma por humedad/impurezas detectada al pesar). `descripcion_descuento` es libre, para anotar el motivo.
 - `GET /detalle-entrada`, `GET /detalle-entrada?movimiento_id=...`, `GET /detalle-entrada/{id}`.
 
 **Detalle de salida** (router y recurso propios, `/detalle-salida`, sin auth por ahora):

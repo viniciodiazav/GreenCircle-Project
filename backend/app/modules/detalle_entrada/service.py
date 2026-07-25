@@ -58,7 +58,9 @@ async def agregar_detalle_entrada(data: DetalleEntradaCreate, db: AsyncSession) 
         material_id=data.material_id,
         peso_bruto=data.peso_bruto,
         tara=data.tara,
+        descuento=data.descuento,
         descripcion=data.descripcion,
+        descripcion_descuento=data.descripcion_descuento,
     )
     db.add(detalle)
     try:

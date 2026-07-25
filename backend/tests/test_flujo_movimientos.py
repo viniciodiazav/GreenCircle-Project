@@ -42,6 +42,51 @@ async def test_detalle_entrada_calcula_peso_neto_y_precio_compra(client):
     data = resp.json()
     assert data["peso_neto"] == 90.0
     assert data["precio_compra"] == 2.0
+    assert data["descuento"] == 0
+
+
+async def test_detalle_entrada_descuento_afecta_peso_neto(client):
+    proveedor_id = await _crear_proveedor(client, "Proveedor Entrada Descuento")
+    material_id = await _crear_material(client, "Material Entrada Descuento")
+    movimiento_id = await _crear_movimiento(client, "ENTRADA")
+
+    resp = await client.post(
+        "/detalle-entrada",
+        json={
+            "movimiento_id": movimiento_id,
+            "proveedor_id": proveedor_id,
+            "material_id": material_id,
+            "peso_bruto": 100,
+            "tara": 10,
+            "descuento": 20,
+            "descripcion_descuento": "Material húmedo",
+        },
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    # peso_neto = (100 - 10) * (1 - 20/100) = 90 * 0.8 = 72
+    assert data["peso_neto"] == 72.0
+    assert data["descuento"] == 20
+    assert data["descripcion_descuento"] == "Material húmedo"
+
+
+async def test_detalle_entrada_descuento_fuera_de_rango_422(client):
+    proveedor_id = await _crear_proveedor(client, "Proveedor Entrada Descuento Malo")
+    material_id = await _crear_material(client, "Material Entrada Descuento Malo")
+    movimiento_id = await _crear_movimiento(client, "ENTRADA")
+
+    resp = await client.post(
+        "/detalle-entrada",
+        json={
+            "movimiento_id": movimiento_id,
+            "proveedor_id": proveedor_id,
+            "material_id": material_id,
+            "peso_bruto": 100,
+            "tara": 10,
+            "descuento": 150,
+        },
+    )
+    assert resp.status_code == 422
 
 
 async def test_detalle_entrada_movimiento_tipo_incorrecto_409(client):

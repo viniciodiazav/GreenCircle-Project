@@ -10,10 +10,12 @@ class DetalleEntradaOut(BaseModel):
     material_id: int
     peso_bruto: float
     tara: float
+    descuento: float
     peso_neto: float
     precio_compra: float
     fecha: datetime
     descripcion: str | None
+    descripcion_descuento: str | None
 
     model_config = {"from_attributes": True}
 
@@ -24,4 +26,6 @@ class DetalleEntradaCreate(BaseModel):
     material_id: int
     peso_bruto: float = Field(gt=0)
     tara: float = Field(ge=0)
+    descuento: float = Field(default=0, ge=0, le=100)
     descripcion: str | None = None
+    descripcion_descuento: str | None = None

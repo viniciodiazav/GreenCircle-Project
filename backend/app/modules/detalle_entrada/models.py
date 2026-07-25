@@ -19,7 +19,11 @@ class DetalleEntrada(Base):
     material_id: Mapped[int] = mapped_column(ForeignKey("materiales.id"))
     peso_bruto: Mapped[float] = mapped_column(Numeric(10, 2))
     tara: Mapped[float] = mapped_column(Numeric(10, 2))
-    peso_neto: Mapped[float] = mapped_column(Numeric(10, 2), Computed("peso_bruto - tara"))
+    descuento: Mapped[float] = mapped_column(Numeric(5, 2), default=0)
+    peso_neto: Mapped[float] = mapped_column(
+        Numeric(10, 2), Computed("(peso_bruto - tara) * (1 - descuento / 100)")
+    )
     precio_compra: Mapped[float | None] = mapped_column(Numeric(10, 2))
     fecha: Mapped[datetime] = mapped_column(server_default=func.now())
     descripcion: Mapped[str | None]
+    descripcion_descuento: Mapped[str | None]
