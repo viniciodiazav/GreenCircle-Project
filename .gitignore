@@ -1,0 +1,6 @@
+# app-movil tiene su propio repo de git independiente
+app-movil/
+
+# artefactos generados por herramientas, no código fuente
+graphify-out/
+.claude/settings.local.json

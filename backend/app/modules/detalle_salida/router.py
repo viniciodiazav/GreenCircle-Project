@@ -1,0 +1,44 @@
+from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.database import get_db
+from app.modules.detalle_salida.schemas import DetalleSalidaCreate, DetalleSalidaOut
+from app.modules.detalle_salida.service import (
+    agregar_detalle_salida,
+    get_detalle_salida_or_404,
+    listar_detalle_salida,
+)
+
+router = APIRouter(prefix="/detalle-salida", tags=["detalle-salida"])
+
+
+def _a_schema(detalle, cantidad_pacas: int) -> DetalleSalidaOut:
+    return DetalleSalidaOut(
+        id=detalle.id,
+        movimiento_id=detalle.movimiento_id,
+        cliente_id=detalle.cliente_id,
+        precio_venta=detalle.precio_venta,
+        fecha=detalle.fecha,
+        descripcion=detalle.descripcion,
+        cantidad_pacas=cantidad_pacas,
+    )
+
+
+@router.get("", response_model=list[DetalleSalidaOut])
+async def get_detalles_salida(
+    movimiento_id: int | None = Query(default=None), db: AsyncSession = Depends(get_db)
+):
+    filas = await listar_detalle_salida(db, movimiento_id=movimiento_id)
+    return [_a_schema(detalle, cantidad) for detalle, cantidad in filas]
+
+
+@router.post("", response_model=DetalleSalidaOut, status_code=status.HTTP_201_CREATED)
+async def post_detalle_salida(data: DetalleSalidaCreate, db: AsyncSession = Depends(get_db)):
+    detalle, cantidad = await agregar_detalle_salida(data, db)
+    return _a_schema(detalle, cantidad)
+
+
+@router.get("/{detalle_id}", response_model=DetalleSalidaOut)
+async def get_detalle_salida(detalle_id: int, db: AsyncSession = Depends(get_db)):
+    detalle, cantidad = await get_detalle_salida_or_404(detalle_id, db)
+    return _a_schema(detalle, cantidad)

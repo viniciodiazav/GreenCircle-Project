@@ -1,0 +1,28 @@
+-- Dominio pacas: unidad compactada que sí se vende (el centro no vende
+-- material suelto). detalle_salida_id amarra la paca a la venta exacta en
+-- la que salió -- necesario para saber cuáles pacas se vendieron, no solo
+-- cuántas.
+
+CREATE TABLE IF NOT EXISTS pacas (
+    id                SERIAL PRIMARY KEY,
+    codigo            VARCHAR(30) NOT NULL UNIQUE,
+    material_id       INTEGER NOT NULL REFERENCES materiales(id),
+    en_inventario     BOOLEAN NOT NULL DEFAULT true,
+    fecha_registro    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    detalle_salida_id INTEGER REFERENCES detalle_salida(id),
+    CHECK (
+        (en_inventario = true  AND detalle_salida_id IS NULL)
+        OR
+        (en_inventario = false AND detalle_salida_id IS NOT NULL)
+    )
+);
+
+-- Historial de eventos de cada paca (mismo patrón que historial_precios):
+-- log append-only, lo llenan los triggers de este archivo, nunca el backend.
+CREATE TABLE IF NOT EXISTS historial_pacas (
+    id                SERIAL PRIMARY KEY,
+    paca_id           INTEGER NOT NULL REFERENCES pacas(id) ON DELETE CASCADE,
+    evento            VARCHAR(10) NOT NULL CHECK (evento IN ('ALTA', 'VENTA')),
+    detalle_salida_id INTEGER REFERENCES detalle_salida(id),
+    fecha             TIMESTAMPTZ NOT NULL DEFAULT now()
+);
