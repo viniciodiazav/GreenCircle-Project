@@ -84,3 +84,26 @@ CREATE TRIGGER trg_historial_paca_venta
     FOR EACH ROW
     WHEN (OLD.en_inventario = true AND NEW.en_inventario = false)
     EXECUTE FUNCTION registrar_historial_paca_venta();
+
+-- Cuando se cancela el detalle_salida que vendió la paca (ver
+-- movimientos/triggers.sql, liberar_pacas_al_cancelar_detalle_salida), la
+-- paca vuelve a en_inventario = true y queda anotada aquí como CANCELACION,
+-- ligada al detalle_salida que se está cancelando (OLD.detalle_salida_id --
+-- para cuando este trigger corre, NEW.detalle_salida_id ya es NULL). Nunca
+-- se borra el evento VENTA original: la cancelación es una línea nueva.
+CREATE OR REPLACE FUNCTION registrar_historial_paca_cancelacion()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO historial_pacas (paca_id, evento, detalle_salida_id, fecha)
+    VALUES (NEW.id, 'CANCELACION', OLD.detalle_salida_id, now());
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_historial_paca_cancelacion ON pacas;
+
+CREATE TRIGGER trg_historial_paca_cancelacion
+    AFTER UPDATE OF en_inventario ON pacas
+    FOR EACH ROW
+    WHEN (OLD.en_inventario = false AND NEW.en_inventario = true)
+    EXECUTE FUNCTION registrar_historial_paca_cancelacion();

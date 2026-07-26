@@ -2,6 +2,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.pagination import Paginacion, ejecutar_paginado
 from app.modules.clientes.models import Cliente
 from app.modules.clientes.schemas import ClienteCreate, ClientePatch
 
@@ -13,12 +14,13 @@ async def get_cliente_or_404(cliente_id: int, db: AsyncSession) -> Cliente:
     return cliente
 
 
-async def listar_clientes(db: AsyncSession, activo: bool | None = None) -> list[Cliente]:
+async def listar_clientes(
+    db: AsyncSession, paginacion: Paginacion, activo: bool | None = None
+) -> tuple[list[Cliente], int]:
     stmt = select(Cliente).order_by(Cliente.nombre)
     if activo is not None:
         stmt = stmt.where(Cliente.activo.is_(activo))
-    result = await db.execute(stmt)
-    return list(result.scalars().all())
+    return await ejecutar_paginado(stmt, db, paginacion)
 
 
 async def crear_cliente(data: ClienteCreate, db: AsyncSession) -> Cliente:

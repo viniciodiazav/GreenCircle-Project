@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.pagination import PaginaOut, Paginacion, parametros_paginacion
 from app.modules.clientes.schemas import ClienteCreate, ClienteOut, ClientePatch
 from app.modules.clientes.service import (
     actualizar_cliente,
@@ -13,11 +14,14 @@ from app.modules.clientes.service import (
 router = APIRouter(prefix="/clientes", tags=["clientes"])
 
 
-@router.get("", response_model=list[ClienteOut])
+@router.get("", response_model=PaginaOut[ClienteOut])
 async def get_clientes(
-    activo: bool | None = Query(default=None), db: AsyncSession = Depends(get_db)
+    activo: bool | None = Query(default=None),
+    paginacion: Paginacion = Depends(parametros_paginacion),
+    db: AsyncSession = Depends(get_db),
 ):
-    return await listar_clientes(db, activo=activo)
+    clientes, total = await listar_clientes(db, paginacion, activo=activo)
+    return PaginaOut(items=clientes, total=total, limit=paginacion.limit, offset=paginacion.offset)
 
 
 @router.post("", response_model=ClienteOut, status_code=status.HTTP_201_CREATED)

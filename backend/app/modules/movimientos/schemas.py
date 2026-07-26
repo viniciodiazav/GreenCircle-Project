@@ -17,3 +17,7 @@ class MovimientoOut(BaseModel):
 class MovimientoCreate(BaseModel):
     tipo: Literal["ENTRADA", "SALIDA"]
     descripcion: str | None = None
+
+
+class MovimientoPatch(BaseModel):
+    descripcion: str | None = None

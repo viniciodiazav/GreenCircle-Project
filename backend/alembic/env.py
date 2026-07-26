@@ -21,6 +21,8 @@ from app.modules.materiales.models import Material  # noqa: F401
 from app.modules.movimientos.models import Movimiento  # noqa: F401
 from app.modules.pacas.models import Paca  # noqa: F401
 from app.modules.proveedores.models import Proveedor  # noqa: F401
+from app.modules.tickets_compra.models import TicketCompra  # noqa: F401
+from app.modules.tickets_venta.models import TicketVenta  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)

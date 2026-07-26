@@ -20,6 +20,7 @@ async def _agregar_inventario(client, material_id, peso):
             "material_id": material_id,
             "peso_bruto": peso + 1,
             "tara": 1,
+            "monto_total": 100,
         },
     )
 
@@ -39,11 +40,11 @@ async def test_ajuste_negativo_resta_inventario(client):
     assert data["comentarios"] is None
 
     inventario = await client.get("/inventario")
-    fila = next(f for f in inventario.json() if f["material_id"] == material_id)
+    fila = next(f for f in inventario.json()["items"] if f["material_id"] == material_id)
     assert fila["peso_total"] == 44.5
 
     historial = await client.get("/historial-kg", params={"material_id": material_id})
-    filas = sorted(historial.json(), key=lambda f: f["fecha_cambio"])
+    filas = sorted(historial.json()["items"], key=lambda f: f["fecha_cambio"])
     assert filas[-1]["peso_anterior"] == 50.0
     assert filas[-1]["peso_nuevo"] == 44.5
 
@@ -65,7 +66,7 @@ async def test_ajuste_positivo_suma_inventario(client):
     assert resp.json()["comentarios"] == "Se recontó dos veces para confirmar"
 
     inventario = await client.get("/inventario")
-    fila = next(f for f in inventario.json() if f["material_id"] == material_id)
+    fila = next(f for f in inventario.json()["items"] if f["material_id"] == material_id)
     assert fila["peso_total"] == 23.2
 
 
@@ -130,6 +131,6 @@ async def test_listar_ajustes_filtra_por_material(client):
 
     resp = await client.get("/ajustes-inventario", params={"material_id": material_id})
     assert resp.status_code == 200
-    filas = resp.json()
+    filas = resp.json()["items"]
     assert len(filas) == 1
     assert filas[0]["material_id"] == material_id

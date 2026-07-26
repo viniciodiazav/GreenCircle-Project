@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.pagination import PaginaOut, Paginacion, parametros_paginacion
 from app.modules.materiales.schemas import (
     MaterialCreate,
     MaterialOut,
@@ -23,20 +24,29 @@ from app.modules.materiales.service import (
 router = APIRouter(prefix="/materiales", tags=["materiales"])
 
 
-@router.get("", response_model=list[MaterialPublicOut])
-async def get_materiales_publico(db: AsyncSession = Depends(get_db)):
-    materiales = await listar_materiales(db, solo_activos=True)
-    return [MaterialPublicOut(nombre=m.nombre, precio=m.precio_actual) for m in materiales]
+@router.get("", response_model=PaginaOut[MaterialPublicOut])
+async def get_materiales_publico(
+    paginacion: Paginacion = Depends(parametros_paginacion), db: AsyncSession = Depends(get_db)
+):
+    materiales, total = await listar_materiales(db, paginacion, solo_activos=True)
+    items = [MaterialPublicOut(nombre=m.nombre, precio=m.precio_actual) for m in materiales]
+    return PaginaOut(items=items, total=total, limit=paginacion.limit, offset=paginacion.offset)
 
 
-@router.get("/admin", response_model=list[MaterialOut])
-async def get_materiales_admin_todos(db: AsyncSession = Depends(get_db)):
-    return await listar_materiales(db, solo_activos=False)
+@router.get("/admin", response_model=PaginaOut[MaterialOut])
+async def get_materiales_admin_todos(
+    paginacion: Paginacion = Depends(parametros_paginacion), db: AsyncSession = Depends(get_db)
+):
+    materiales, total = await listar_materiales(db, paginacion, solo_activos=False)
+    return PaginaOut(items=materiales, total=total, limit=paginacion.limit, offset=paginacion.offset)
 
 
-@router.get("/admin/activos", response_model=list[MaterialOut])
-async def get_materiales_admin_activos(db: AsyncSession = Depends(get_db)):
-    return await listar_materiales(db, solo_activos=True)
+@router.get("/admin/activos", response_model=PaginaOut[MaterialOut])
+async def get_materiales_admin_activos(
+    paginacion: Paginacion = Depends(parametros_paginacion), db: AsyncSession = Depends(get_db)
+):
+    materiales, total = await listar_materiales(db, paginacion, solo_activos=True)
+    return PaginaOut(items=materiales, total=total, limit=paginacion.limit, offset=paginacion.offset)
 
 
 @router.post("", response_model=MaterialOut, status_code=status.HTTP_201_CREATED)

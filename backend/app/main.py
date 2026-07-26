@@ -14,6 +14,8 @@ from app.modules.materiales.router import router as materiales_router
 from app.modules.movimientos.router import router as movimientos_router
 from app.modules.pacas.router import router as pacas_router
 from app.modules.proveedores.router import router as proveedores_router
+from app.modules.tickets_compra.router import router as tickets_compra_router
+from app.modules.tickets_venta.router import router as tickets_venta_router
 
 app = FastAPI(title="Centro de Recolección - API")
 
@@ -36,6 +38,8 @@ app.include_router(historial_precios_router)
 app.include_router(historial_kg_router)
 app.include_router(historial_pacas_router)
 app.include_router(ajustes_inventario_router)
+app.include_router(tickets_venta_router)
+app.include_router(tickets_compra_router)
 app.include_router(auth_router)
 
 

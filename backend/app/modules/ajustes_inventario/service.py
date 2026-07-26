@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.pagination import Paginacion, ejecutar_paginado
 from app.modules.ajustes_inventario.models import AjusteInventario
 from app.modules.ajustes_inventario.schemas import AjusteInventarioCreate
 
@@ -12,12 +13,13 @@ from app.modules.ajustes_inventario.schemas import AjusteInventarioCreate
 from app.modules.materiales.models import Material
 
 
-async def listar_ajustes(db: AsyncSession, material_id: int | None = None) -> list[AjusteInventario]:
+async def listar_ajustes(
+    db: AsyncSession, paginacion: Paginacion, material_id: int | None = None
+) -> tuple[list[AjusteInventario], int]:
     stmt = select(AjusteInventario).order_by(AjusteInventario.fecha.desc())
     if material_id is not None:
         stmt = stmt.where(AjusteInventario.material_id == material_id)
-    result = await db.execute(stmt)
-    return list(result.scalars().all())
+    return await ejecutar_paginado(stmt, db, paginacion)
 
 
 async def crear_ajuste(data: AjusteInventarioCreate, db: AsyncSession) -> AjusteInventario:

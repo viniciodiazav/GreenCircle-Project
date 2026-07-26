@@ -24,6 +24,9 @@ class DetalleEntrada(Base):
         Numeric(10, 2), Computed("(peso_bruto - tara) * (1 - descuento / 100)")
     )
     precio_compra: Mapped[float | None] = mapped_column(Numeric(10, 2))
+    # No se calcula solo (a diferencia de peso_neto/precio_compra) -- lo
+    # ingresa quien registra la entrada.
+    monto_total: Mapped[float] = mapped_column(Numeric(10, 2))
     fecha: Mapped[datetime] = mapped_column(server_default=func.now())
     descripcion: Mapped[str | None]
     descripcion_descuento: Mapped[str | None]

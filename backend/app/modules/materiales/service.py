@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.pagination import Paginacion, ejecutar_paginado
 from app.modules.materiales.codigo import generar_codigo_base
 from app.modules.materiales.models import Material
 from app.modules.materiales.schemas import MaterialCreate, MaterialPatch
@@ -15,12 +16,13 @@ async def get_material_or_404(material_id: int, db: AsyncSession) -> Material:
     return material
 
 
-async def listar_materiales(db: AsyncSession, solo_activos: bool = True) -> list[Material]:
+async def listar_materiales(
+    db: AsyncSession, paginacion: Paginacion, solo_activos: bool = True
+) -> tuple[list[Material], int]:
     stmt = select(Material).order_by(Material.nombre)
     if solo_activos:
         stmt = stmt.where(Material.activo.is_(True))
-    result = await db.execute(stmt)
-    return list(result.scalars().all())
+    return await ejecutar_paginado(stmt, db, paginacion)
 
 
 async def _codigo_disponible(codigo: str, db: AsyncSession) -> bool:

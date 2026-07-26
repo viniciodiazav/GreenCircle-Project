@@ -31,7 +31,7 @@ async def test_patch_material_actualiza_precio_y_genera_historial(client):
 
     historial = await client.get("/historial-precios", params={"material_id": material_id})
     assert historial.status_code == 200
-    filas = historial.json()
+    filas = historial.json()["items"]
     assert len(filas) == 1
     assert filas[0]["precio_anterior"] == 3.0
     assert filas[0]["precio_nuevo"] == 4.5
@@ -55,9 +55,9 @@ async def test_get_materiales_publico_solo_activos(client):
     await client.patch(f"/materiales/{material_id}", json={"activo": False})
 
     publico = await client.get("/materiales")
-    nombres = [m["nombre"] for m in publico.json()]
+    nombres = [m["nombre"] for m in publico.json()["items"]]
     assert "Estanotest" not in nombres
 
     admin = await client.get("/materiales/admin")
-    nombres_admin = [m["nombre"] for m in admin.json()]
+    nombres_admin = [m["nombre"] for m in admin.json()["items"]]
     assert "Estanotest" in nombres_admin

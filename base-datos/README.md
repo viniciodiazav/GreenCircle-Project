@@ -20,6 +20,8 @@ pacas/schema.sql
 pacas/triggers.sql
 inventario/schema.sql
 inventario/triggers.sql
+tickets/schema.sql
+tickets/triggers.sql
 materiales/seed.sql
 auth/seed.sql
 ```
@@ -60,6 +62,65 @@ y `sincronizar_inventario_ajuste` en `inventario/triggers.sql`). Los
 triggers que solo suman (`sincronizar_inventario_entrada`,
 `sincronizar_inventario_pacas_alta`) no tienen este problema porque su
 valor inicial de `INSERT` siempre es válido por sí solo.
+
+**Regla de negocio (agregada 2026-07-26): un movimiento no puede mezclar
+proveedores o clientes.** Todos los `detalle_entrada` de un mismo
+`movimiento_id` deben tener el mismo `proveedor_id`, y todos los
+`detalle_salida` de un mismo `movimiento_id` deben tener el mismo
+`cliente_id`. `movimientos/triggers.sql` lo bloquea (`RAISE EXCEPTION`) al
+insertar un detalle que no coincide con el proveedor/cliente ya usado en ese
+movimiento; el backend valida lo mismo antes para dar un 409 legible.
+
+**`monto_total`** (en `detalle_entrada`/`detalle_salida`, `movimientos/schema.sql`):
+a diferencia de `peso_neto`/`precio_compra`, NO se calcula solo -- lo ingresa
+quien registra el detalle, debe ser `>= 0`.
+
+**Un movimiento sin detalles no puede cerrarse.** `movimientos/triggers.sql`
+lo bloquea (`RAISE EXCEPTION`) en un `BEFORE UPDATE OF cerrado`: no habría de
+dónde sacar el proveedor/cliente ni los materiales para su ticket.
+
+**`tickets`** (`tickets/schema.sql` + `tickets/triggers.sql`): al cerrar un
+movimiento se genera automáticamente su comprobante -- `ticket_venta` si es
+`SALIDA`, `ticket_compra` si es `ENTRADA` -- vía trigger `AFTER UPDATE OF
+cerrado ON movimientos` (mismo principio que los historiales: el backend
+nunca escribe en estas tablas). Cliente/proveedor y materiales se sacan de
+los detalles del movimiento (por la regla de arriba, todos comparten el
+mismo proveedor/cliente). El `folio` es único y se arma solo:
+`{V|C}-{fecha YYYYMMDD}-{correlativo del día}` (mismo patrón que el código
+de pacas). `tickets/schema.sql` requiere `movimientos` (con
+`detalle_entrada`/`detalle_salida`), `pacas`, `materiales`, `proveedores` y
+`clientes` ya creados.
+
+**Edición y cancelación de detalles (agregado 2026-07-26).** Antes, un error
+de captura no tenía forma de corregirse salvo con `ajustes_inventario`
+(que corrige el número final, no el registro original). Ahora, mientras el
+movimiento sigue **abierto**, el backend permite:
+- Editar `peso_bruto`/`tara`/`descuento` (y otros campos sin efecto lateral)
+  de un `detalle_entrada`. `peso_neto` se recalcula solo (columna
+  `GENERATED`) y `trg_sincronizar_inventario_entrada_editada`
+  (`inventario/triggers.sql`) aplica el **delta** (`peso_neto` nuevo menos
+  el viejo) al inventario, anotando la corrección en `historial_kg` --
+  mismo principio que un ajuste manual, pero automático.
+- Cancelar (borrar) un `detalle_entrada`: `trg_revertir_inventario_entrada_cancelada`
+  resta de vuelta su `peso_neto` del inventario. Si ese material ya se
+  compactó en una paca y revertir dejaría `peso_total` negativo, el `CHECK`
+  de siempre rechaza la cancelación (409 legible desde el backend).
+- Cancelar (borrar) un `detalle_salida`: `trg_liberar_pacas_al_cancelar_detalle_salida`
+  (`movimientos/triggers.sql`) libera las pacas que vendía
+  (`en_inventario = true`, `detalle_salida_id = NULL`) antes del `DELETE`,
+  lo que dispara en cadena `trg_reactivar_inventario_pacas`
+  (`inventario/triggers.sql`, +1 a `inventario_pacas`) y
+  `trg_historial_paca_cancelacion` (`pacas/triggers.sql`, evento
+  `CANCELACION` en `historial_pacas` -- nunca se borra el evento `VENTA`
+  original).
+- Cancelar (borrar) un movimiento **vacío y abierto** (sin detalles).
+
+**No se permite editar/cancelar nada una vez el movimiento está cerrado**
+-- ya se generó su ticket y ya se disparó todo el efecto en cadena
+(inventario, historial, pacas vendidas); revertir eso de forma segura queda
+fuera de este alcance. Tampoco se permite cambiar `proveedor_id`/`material_id`/
+`cliente_id`/`pacas` vía edición -- si la entidad o las pacas están mal, se
+cancela la línea y se crea una nueva.
 
 ## Cómo agregar un módulo nuevo (ej. `camiones`)
 

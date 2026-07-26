@@ -14,17 +14,17 @@ async def test_filtrar_activos_e_inactivos(client):
     assert patch.json()["activo"] is False
 
     solo_activos = await client.get("/proveedores", params={"activo": "true"})
-    nombres_activos = [p["nombre"] for p in solo_activos.json()]
+    nombres_activos = [p["nombre"] for p in solo_activos.json()["items"]]
     assert "Proveedor Activo Prueba" in nombres_activos
     assert "Proveedor Inactivo Prueba" not in nombres_activos
 
     solo_inactivos = await client.get("/proveedores", params={"activo": "false"})
-    nombres_inactivos = [p["nombre"] for p in solo_inactivos.json()]
+    nombres_inactivos = [p["nombre"] for p in solo_inactivos.json()["items"]]
     assert "Proveedor Inactivo Prueba" in nombres_inactivos
     assert "Proveedor Activo Prueba" not in nombres_inactivos
 
-    sin_filtro = await client.get("/proveedores")
-    nombres = [p["nombre"] for p in sin_filtro.json()]
+    sin_filtro = await client.get("/proveedores", params={"limit": 200})
+    nombres = [p["nombre"] for p in sin_filtro.json()["items"]]
     assert "Proveedor Activo Prueba" in nombres
     assert "Proveedor Inactivo Prueba" in nombres
 

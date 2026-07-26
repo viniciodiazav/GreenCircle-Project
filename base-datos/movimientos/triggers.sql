@@ -96,3 +96,114 @@ CREATE TRIGGER trg_validar_activo_salida
     BEFORE INSERT ON detalle_salida
     FOR EACH ROW
     EXECUTE FUNCTION validar_activo_detalle_salida();
+
+-- Regla de negocio: todos los detalles de un mismo movimiento deben ser del
+-- mismo proveedor (entrada) o del mismo cliente (salida) -- un movimiento no
+-- puede mezclar dos proveedores/clientes distintos en sus líneas.
+CREATE OR REPLACE FUNCTION validar_mismo_proveedor_detalle_entrada()
+RETURNS TRIGGER AS $$
+DECLARE
+    proveedor_existente INTEGER;
+BEGIN
+    SELECT proveedor_id INTO proveedor_existente
+    FROM detalle_entrada
+    WHERE movimiento_id = NEW.movimiento_id
+    LIMIT 1;
+
+    IF proveedor_existente IS NOT NULL AND proveedor_existente <> NEW.proveedor_id THEN
+        RAISE EXCEPTION 'El movimiento % ya tiene detalles del proveedor %, no puede mezclar proveedores', NEW.movimiento_id, proveedor_existente;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_validar_mismo_proveedor_entrada ON detalle_entrada;
+
+CREATE TRIGGER trg_validar_mismo_proveedor_entrada
+    BEFORE INSERT ON detalle_entrada
+    FOR EACH ROW
+    EXECUTE FUNCTION validar_mismo_proveedor_detalle_entrada();
+
+CREATE OR REPLACE FUNCTION validar_mismo_cliente_detalle_salida()
+RETURNS TRIGGER AS $$
+DECLARE
+    cliente_existente INTEGER;
+BEGIN
+    SELECT cliente_id INTO cliente_existente
+    FROM detalle_salida
+    WHERE movimiento_id = NEW.movimiento_id
+    LIMIT 1;
+
+    IF cliente_existente IS NOT NULL AND cliente_existente <> NEW.cliente_id THEN
+        RAISE EXCEPTION 'El movimiento % ya tiene detalles del cliente %, no puede mezclar clientes', NEW.movimiento_id, cliente_existente;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_validar_mismo_cliente_salida ON detalle_salida;
+
+CREATE TRIGGER trg_validar_mismo_cliente_salida
+    BEFORE INSERT ON detalle_salida
+    FOR EACH ROW
+    EXECUTE FUNCTION validar_mismo_cliente_detalle_salida();
+
+-- Un movimiento sin ningún detalle no puede cerrarse -- no habría de dónde
+-- sacar el proveedor/cliente ni los materiales para armar su ticket
+-- (ver base-datos/tickets/triggers.sql).
+CREATE OR REPLACE FUNCTION validar_movimiento_no_vacio()
+RETURNS TRIGGER AS $$
+DECLARE
+    tiene_detalles BOOLEAN;
+BEGIN
+    IF NEW.cerrado = true AND OLD.cerrado = false THEN
+        IF NEW.tipo = 'ENTRADA' THEN
+            SELECT EXISTS(SELECT 1 FROM detalle_entrada WHERE movimiento_id = NEW.id) INTO tiene_detalles;
+        ELSE
+            SELECT EXISTS(SELECT 1 FROM detalle_salida WHERE movimiento_id = NEW.id) INTO tiene_detalles;
+        END IF;
+
+        IF NOT tiene_detalles THEN
+            RAISE EXCEPTION 'El movimiento % no tiene detalles, no se puede cerrar', NEW.id;
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_validar_movimiento_no_vacio ON movimientos;
+
+CREATE TRIGGER trg_validar_movimiento_no_vacio
+    BEFORE UPDATE OF cerrado ON movimientos
+    FOR EACH ROW
+    EXECUTE FUNCTION validar_movimiento_no_vacio();
+
+-- Cancelación de detalle_salida (agregada 2026-07-26, solo permitida por el
+-- backend mientras el movimiento sigue abierto): antes de borrar la fila,
+-- libera las pacas que vendía -- en_inventario = true, detalle_salida_id =
+-- NULL -- para que la FK pacas.detalle_salida_id no bloquee el DELETE y para
+-- que esas pacas vuelvan a estar disponibles para vender. El UPDATE de
+-- pacas dispara a su vez trg_reactivar_inventario_pacas y
+-- trg_historial_paca_cancelacion (ver inventario/triggers.sql y
+-- pacas/triggers.sql).
+CREATE OR REPLACE FUNCTION liberar_pacas_al_cancelar_detalle_salida()
+RETURNS TRIGGER AS $$
+BEGIN
+    UPDATE pacas
+        SET en_inventario = true,
+            detalle_salida_id = NULL
+        WHERE detalle_salida_id = OLD.id;
+
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_liberar_pacas_al_cancelar_detalle_salida ON detalle_salida;
+
+CREATE TRIGGER trg_liberar_pacas_al_cancelar_detalle_salida
+    BEFORE DELETE ON detalle_salida
+    FOR EACH ROW
+    EXECUTE FUNCTION liberar_pacas_al_cancelar_detalle_salida();

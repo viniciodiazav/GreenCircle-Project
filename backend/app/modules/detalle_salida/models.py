@@ -17,5 +17,7 @@ class DetalleSalida(Base):
     tipo_movimiento: Mapped[str] = mapped_column(default="SALIDA")
     cliente_id: Mapped[int] = mapped_column(ForeignKey("clientes.id"))
     precio_venta: Mapped[float] = mapped_column(Numeric(10, 2))
+    # No se calcula solo -- lo ingresa quien registra la salida.
+    monto_total: Mapped[float] = mapped_column(Numeric(10, 2))
     fecha: Mapped[datetime] = mapped_column(server_default=func.now())
     descripcion: Mapped[str | None]

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.pagination import PaginaOut, Paginacion, parametros_paginacion
 from app.modules.proveedores.schemas import ProveedorCreate, ProveedorOut, ProveedorPatch
 from app.modules.proveedores.service import (
     actualizar_proveedor,
@@ -13,11 +14,14 @@ from app.modules.proveedores.service import (
 router = APIRouter(prefix="/proveedores", tags=["proveedores"])
 
 
-@router.get("", response_model=list[ProveedorOut])
+@router.get("", response_model=PaginaOut[ProveedorOut])
 async def get_proveedores(
-    activo: bool | None = Query(default=None), db: AsyncSession = Depends(get_db)
+    activo: bool | None = Query(default=None),
+    paginacion: Paginacion = Depends(parametros_paginacion),
+    db: AsyncSession = Depends(get_db),
 ):
-    return await listar_proveedores(db, activo=activo)
+    proveedores, total = await listar_proveedores(db, paginacion, activo=activo)
+    return PaginaOut(items=proveedores, total=total, limit=paginacion.limit, offset=paginacion.offset)
 
 
 @router.post("", response_model=ProveedorOut, status_code=status.HTTP_201_CREATED)

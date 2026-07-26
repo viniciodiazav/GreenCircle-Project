@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.pagination import Paginacion, ejecutar_paginado
 from app.modules.pacas.models import Paca
 from app.modules.pacas.schemas import PacaCreate
 
@@ -25,12 +26,13 @@ async def get_paca_or_404(paca_id: int, db: AsyncSession) -> Paca:
     return paca
 
 
-async def listar_pacas(db: AsyncSession, en_inventario: bool | None = None) -> list[Paca]:
+async def listar_pacas(
+    db: AsyncSession, paginacion: Paginacion, en_inventario: bool | None = None
+) -> tuple[list[Paca], int]:
     stmt = select(Paca).order_by(Paca.fecha_registro.desc())
     if en_inventario is not None:
         stmt = stmt.where(Paca.en_inventario.is_(en_inventario))
-    result = await db.execute(stmt)
-    return list(result.scalars().all())
+    return await ejecutar_paginado(stmt, db, paginacion)
 
 
 async def registrar_paca(data: PacaCreate, db: AsyncSession) -> Paca:

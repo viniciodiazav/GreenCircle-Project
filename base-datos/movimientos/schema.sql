@@ -28,6 +28,9 @@ CREATE TABLE IF NOT EXISTS detalle_entrada (
     -- bruto -- ej. merma por humedad/impurezas detectada al pesar.
     peso_neto       NUMERIC(10, 2) GENERATED ALWAYS AS ((peso_bruto - tara) * (1 - descuento / 100)) STORED,
     precio_compra   NUMERIC(10, 2) NOT NULL CHECK (precio_compra > 0),
+    -- A diferencia de peso_neto/precio_compra, monto_total NO se calcula
+    -- solo -- lo ingresa quien registra la entrada (ver base-datos/README.md).
+    monto_total     NUMERIC(10, 2) NOT NULL CHECK (monto_total >= 0),
     fecha           TIMESTAMPTZ NOT NULL DEFAULT now(),
     descripcion     TEXT,
     descripcion_descuento TEXT,
@@ -41,6 +44,7 @@ CREATE TABLE IF NOT EXISTS detalle_salida (
     tipo_movimiento VARCHAR(10) NOT NULL DEFAULT 'SALIDA' CHECK (tipo_movimiento = 'SALIDA'),
     cliente_id      INTEGER NOT NULL REFERENCES clientes(id),
     precio_venta    NUMERIC(10, 2) NOT NULL CHECK (precio_venta > 0),
+    monto_total     NUMERIC(10, 2) NOT NULL CHECK (monto_total >= 0),
     fecha           TIMESTAMPTZ NOT NULL DEFAULT now(),
     descripcion     TEXT,
     FOREIGN KEY (movimiento_id, tipo_movimiento) REFERENCES movimientos (id, tipo)
