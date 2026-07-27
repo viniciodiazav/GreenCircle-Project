@@ -80,21 +80,29 @@ CREATE TRIGGER trg_sincronizar_inventario_entrada_editada
 -- ya se usó (ej. se compactó una paca con ese material) y revertir dejaría
 -- peso_total en negativo, el CHECK (peso_total >= 0) rechaza la cancelación
 -- -- no se puede cancelar una entrada cuyo material ya se movió.
+-- usuario_id sale de current_setting('app.usuario_actual', true) -- el
+-- backend hace SET LOCAL antes del DELETE (ver app.core.database.
+-- set_usuario_actual) para que este trigger sepa quién canceló. El segundo
+-- argumento `true` de current_setting evita un error si no está seteado
+-- (ej. un DELETE hecho directo en psql sin pasar por la app); NULLIF sobre
+-- '' cubre el caso "seteado pero vacío".
 CREATE OR REPLACE FUNCTION revertir_inventario_entrada_cancelada()
 RETURNS TRIGGER AS $$
 DECLARE
     peso_previo NUMERIC(12, 2);
+    usuario_actual INTEGER;
 BEGIN
     SELECT peso_total INTO peso_previo FROM inventario WHERE material_id = OLD.material_id;
     peso_previo := COALESCE(peso_previo, 0);
+    usuario_actual := NULLIF(current_setting('app.usuario_actual', true), '')::INTEGER;
 
     UPDATE inventario
         SET peso_total = peso_total - OLD.peso_neto,
             actualizado_en = now()
         WHERE material_id = OLD.material_id;
 
-    INSERT INTO historial_kg (material_id, peso_anterior, peso_nuevo, fecha_cambio)
-    VALUES (OLD.material_id, peso_previo, peso_previo - OLD.peso_neto, now());
+    INSERT INTO historial_kg (material_id, peso_anterior, peso_nuevo, fecha_cambio, usuario_id)
+    VALUES (OLD.material_id, peso_previo, peso_previo - OLD.peso_neto, now(), usuario_actual);
 
     RETURN OLD;
 END;

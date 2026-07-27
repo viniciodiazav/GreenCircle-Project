@@ -24,12 +24,17 @@ CREATE TABLE IF NOT EXISTS inventario_pacas (
 -- historial_precios: log append-only, lo llena un trigger, nunca el backend).
 -- Une TODOS los cambios en una sola línea de tiempo: entradas, pacas
 -- registradas, y ajustes manuales (ver ajustes_inventario más abajo).
+-- usuario_id: solo lo llena revertir_inventario_entrada_cancelada (ver
+-- triggers.sql) -- quién canceló la entrada. Los demás triggers que
+-- insertan aquí (entrada normal, paca registrada, ajuste) no lo tocan,
+-- queda NULL.
 CREATE TABLE IF NOT EXISTS historial_kg (
     id              SERIAL PRIMARY KEY,
     material_id     INTEGER NOT NULL REFERENCES materiales(id),
     peso_anterior   NUMERIC(12, 2) NOT NULL,
     peso_nuevo      NUMERIC(12, 2) NOT NULL,
-    fecha_cambio    TIMESTAMPTZ NOT NULL DEFAULT now()
+    fecha_cambio    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    usuario_id      INTEGER REFERENCES usuarios(id)
 );
 
 -- Ledger de correcciones manuales al inventario suelto -- para cuando un
@@ -44,5 +49,6 @@ CREATE TABLE IF NOT EXISTS ajustes_inventario (
     peso_ajuste  NUMERIC(12, 2) NOT NULL CHECK (peso_ajuste <> 0),
     motivo       TEXT NOT NULL,
     comentarios  TEXT,
-    fecha        TIMESTAMPTZ NOT NULL DEFAULT now()
+    fecha        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    creado_por   INTEGER REFERENCES usuarios(id)
 );

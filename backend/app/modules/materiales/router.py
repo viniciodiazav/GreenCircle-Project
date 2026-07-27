@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.pagination import PaginaOut, Paginacion, parametros_paginacion
+from app.core.security import get_current_user
 from app.modules.materiales.schemas import (
     MaterialCreate,
     MaterialOut,
@@ -15,12 +16,11 @@ from app.modules.materiales.service import (
     listar_materiales,
 )
 
-# Sin autenticación por ahora en ninguna ruta (decisión explícita del usuario,
-# 2026-07-25): la app móvil y "el sistema" van a tener esquemas de login
-# distintos y ninguno de los dos está definido todavía.
-#
-# Solo materiales aquí -- el historial de precios vive en su propio router
-# (app.modules.historial_precios), no anidado bajo /materiales.
+# GET "" (público) es intencional: es el listado de precios que ve cualquiera
+# en la app móvil sin loguearse (ver app-movil/src/screens/HomeScreen.tsx).
+# Todo lo demás (admin, alta, edición) requiere sesión -- se protege endpoint
+# por endpoint en vez de a nivel de router porque este es el único módulo con
+# una ruta pública mezclada con rutas de admin.
 router = APIRouter(prefix="/materiales", tags=["materiales"])
 
 
@@ -33,7 +33,7 @@ async def get_materiales_publico(
     return PaginaOut(items=items, total=total, limit=paginacion.limit, offset=paginacion.offset)
 
 
-@router.get("/admin", response_model=PaginaOut[MaterialOut])
+@router.get("/admin", response_model=PaginaOut[MaterialOut], dependencies=[Depends(get_current_user)])
 async def get_materiales_admin_todos(
     paginacion: Paginacion = Depends(parametros_paginacion), db: AsyncSession = Depends(get_db)
 ):
@@ -41,7 +41,9 @@ async def get_materiales_admin_todos(
     return PaginaOut(items=materiales, total=total, limit=paginacion.limit, offset=paginacion.offset)
 
 
-@router.get("/admin/activos", response_model=PaginaOut[MaterialOut])
+@router.get(
+    "/admin/activos", response_model=PaginaOut[MaterialOut], dependencies=[Depends(get_current_user)]
+)
 async def get_materiales_admin_activos(
     paginacion: Paginacion = Depends(parametros_paginacion), db: AsyncSession = Depends(get_db)
 ):
@@ -49,12 +51,19 @@ async def get_materiales_admin_activos(
     return PaginaOut(items=materiales, total=total, limit=paginacion.limit, offset=paginacion.offset)
 
 
-@router.post("", response_model=MaterialOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=MaterialOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(get_current_user)],
+)
 async def post_material(data: MaterialCreate, db: AsyncSession = Depends(get_db)):
     return await crear_material(data, db)
 
 
-@router.patch("/{material_id}", response_model=MaterialOut)
+@router.patch(
+    "/{material_id}", response_model=MaterialOut, dependencies=[Depends(get_current_user)]
+)
 async def patch_material(
     material_id: int, data: MaterialPatch, db: AsyncSession = Depends(get_db)
 ):

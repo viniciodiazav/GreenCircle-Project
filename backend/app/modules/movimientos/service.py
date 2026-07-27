@@ -30,8 +30,8 @@ async def listar_movimientos(
     return await ejecutar_paginado(stmt, db, paginacion)
 
 
-async def crear_movimiento(data: MovimientoCreate, db: AsyncSession) -> Movimiento:
-    movimiento = Movimiento(tipo=data.tipo, descripcion=data.descripcion)
+async def crear_movimiento(data: MovimientoCreate, db: AsyncSession, usuario_id: int) -> Movimiento:
+    movimiento = Movimiento(tipo=data.tipo, descripcion=data.descripcion, creado_por=usuario_id)
     db.add(movimiento)
     await db.commit()
     await db.refresh(movimiento)

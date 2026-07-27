@@ -10,6 +10,7 @@ class MovimientoOut(BaseModel):
     fecha: datetime
     cerrado: bool
     descripcion: str | None
+    creado_por: int | None
 
     model_config = {"from_attributes": True}
 

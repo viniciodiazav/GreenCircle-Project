@@ -3,10 +3,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.pagination import PaginaOut, Paginacion, parametros_paginacion
+from app.core.security import get_current_user
 from app.modules.tickets_venta.schemas import TicketVentaOut
 from app.modules.tickets_venta.service import get_ticket_venta_or_404, listar_tickets_venta
 
-router = APIRouter(prefix="/tickets-venta", tags=["tickets-venta"])
+router = APIRouter(prefix="/tickets-venta", tags=["tickets-venta"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("", response_model=PaginaOut[TicketVentaOut])

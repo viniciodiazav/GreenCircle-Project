@@ -14,3 +14,6 @@ class HistorialKg(Base):
     peso_anterior: Mapped[float] = mapped_column(Numeric(12, 2))
     peso_nuevo: Mapped[float] = mapped_column(Numeric(12, 2))
     fecha_cambio: Mapped[datetime]
+    # Solo se llena en cancelaciones (revertir_inventario_entrada_cancelada) --
+    # los demás triggers que insertan aquí no cambian, quedan NULL.
+    usuario_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"))

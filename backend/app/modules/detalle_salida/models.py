@@ -21,3 +21,4 @@ class DetalleSalida(Base):
     monto_total: Mapped[float] = mapped_column(Numeric(10, 2))
     fecha: Mapped[datetime] = mapped_column(server_default=func.now())
     descripcion: Mapped[str | None]
+    creado_por: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"))

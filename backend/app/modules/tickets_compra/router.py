@@ -3,10 +3,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.pagination import PaginaOut, Paginacion, parametros_paginacion
+from app.core.security import get_current_user
 from app.modules.tickets_compra.schemas import TicketCompraOut
 from app.modules.tickets_compra.service import get_ticket_compra_or_404, listar_tickets_compra
 
-router = APIRouter(prefix="/tickets-compra", tags=["tickets-compra"])
+router = APIRouter(
+    prefix="/tickets-compra", tags=["tickets-compra"], dependencies=[Depends(get_current_user)]
+)
 
 
 @router.get("", response_model=PaginaOut[TicketCompraOut])

@@ -14,3 +14,6 @@ class HistorialPaca(Base):
     evento: Mapped[str]
     detalle_salida_id: Mapped[int | None] = mapped_column(ForeignKey("detalle_salida.id"))
     fecha: Mapped[datetime]
+    # Solo se llena en el evento CANCELACION (registrar_historial_paca_cancelacion)
+    # -- ALTA y VENTA no cambian, quedan NULL.
+    usuario_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"))

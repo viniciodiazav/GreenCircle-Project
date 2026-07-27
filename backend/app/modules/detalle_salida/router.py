@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.pagination import PaginaOut, Paginacion, parametros_paginacion
+from app.core.security import UsuarioActual, get_current_user
 from app.modules.detalle_salida.schemas import (
     DetalleSalidaCreate,
     DetalleSalidaOut,
@@ -16,7 +17,9 @@ from app.modules.detalle_salida.service import (
     listar_detalle_salida,
 )
 
-router = APIRouter(prefix="/detalle-salida", tags=["detalle-salida"])
+router = APIRouter(
+    prefix="/detalle-salida", tags=["detalle-salida"], dependencies=[Depends(get_current_user)]
+)
 
 
 def _a_schema(detalle, cantidad_pacas: int) -> DetalleSalidaOut:
@@ -29,6 +32,7 @@ def _a_schema(detalle, cantidad_pacas: int) -> DetalleSalidaOut:
         fecha=detalle.fecha,
         descripcion=detalle.descripcion,
         cantidad_pacas=cantidad_pacas,
+        creado_por=detalle.creado_por,
     )
 
 
@@ -44,8 +48,12 @@ async def get_detalles_salida(
 
 
 @router.post("", response_model=DetalleSalidaOut, status_code=status.HTTP_201_CREATED)
-async def post_detalle_salida(data: DetalleSalidaCreate, db: AsyncSession = Depends(get_db)):
-    detalle, cantidad = await agregar_detalle_salida(data, db)
+async def post_detalle_salida(
+    data: DetalleSalidaCreate,
+    db: AsyncSession = Depends(get_db),
+    usuario: UsuarioActual = Depends(get_current_user),
+):
+    detalle, cantidad = await agregar_detalle_salida(data, db, usuario.id)
     return _a_schema(detalle, cantidad)
 
 
@@ -64,5 +72,9 @@ async def patch_detalle_salida(
 
 
 @router.delete("/{detalle_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_detalle_salida(detalle_id: int, db: AsyncSession = Depends(get_db)):
-    await cancelar_detalle_salida(detalle_id, db)
+async def delete_detalle_salida(
+    detalle_id: int,
+    db: AsyncSession = Depends(get_db),
+    usuario: UsuarioActual = Depends(get_current_user),
+):
+    await cancelar_detalle_salida(detalle_id, db, usuario.id)

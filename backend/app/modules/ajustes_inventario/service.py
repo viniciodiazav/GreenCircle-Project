@@ -22,7 +22,9 @@ async def listar_ajustes(
     return await ejecutar_paginado(stmt, db, paginacion)
 
 
-async def crear_ajuste(data: AjusteInventarioCreate, db: AsyncSession) -> AjusteInventario:
+async def crear_ajuste(
+    data: AjusteInventarioCreate, db: AsyncSession, usuario_id: int
+) -> AjusteInventario:
     material = await db.get(Material, data.material_id)
     if material is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="material_id no existe")
@@ -32,6 +34,7 @@ async def crear_ajuste(data: AjusteInventarioCreate, db: AsyncSession) -> Ajuste
         peso_ajuste=data.peso_ajuste,
         motivo=data.motivo,
         comentarios=data.comentarios,
+        creado_por=usuario_id,
     )
     db.add(ajuste)
     try:

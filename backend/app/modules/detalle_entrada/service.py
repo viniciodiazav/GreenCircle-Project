@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.database import set_usuario_actual
 from app.core.pagination import Paginacion, ejecutar_paginado
 from app.modules.detalle_entrada.models import DetalleEntrada
 from app.modules.detalle_entrada.schemas import DetalleEntradaCreate, DetalleEntradaPatch
@@ -38,7 +39,9 @@ async def listar_detalle_entrada(
     return await ejecutar_paginado(stmt, db, paginacion)
 
 
-async def agregar_detalle_entrada(data: DetalleEntradaCreate, db: AsyncSession) -> DetalleEntrada:
+async def agregar_detalle_entrada(
+    data: DetalleEntradaCreate, db: AsyncSession, usuario_id: int
+) -> DetalleEntrada:
     movimiento: Movimiento = await get_movimiento_or_404(data.movimiento_id, db)
     validar_movimiento_para_detalle(movimiento, "ENTRADA")
 
@@ -76,6 +79,7 @@ async def agregar_detalle_entrada(data: DetalleEntradaCreate, db: AsyncSession) 
         monto_total=data.monto_total,
         descripcion=data.descripcion,
         descripcion_descuento=data.descripcion_descuento,
+        creado_por=usuario_id,
     )
     db.add(detalle)
     try:
@@ -137,7 +141,7 @@ async def actualizar_detalle_entrada(
     return detalle
 
 
-async def cancelar_detalle_entrada(detalle_id: int, db: AsyncSession) -> None:
+async def cancelar_detalle_entrada(detalle_id: int, db: AsyncSession, usuario_id: int) -> None:
     """Cancela (borra) una línea capturada por error -- solo mientras el
     movimiento sigue abierto. Un trigger en BD revierte lo que había sumado
     al inventario (ver revertir_inventario_entrada_cancelada); si ese
@@ -151,6 +155,9 @@ async def cancelar_detalle_entrada(detalle_id: int, db: AsyncSession) -> None:
             detail="El movimiento ya está cerrado, no se pueden cancelar sus detalles",
         )
 
+    # El trigger revertir_inventario_entrada_cancelada (AFTER DELETE) lee esto
+    # para anotar quién canceló en historial_kg.
+    await set_usuario_actual(db, usuario_id)
     await db.delete(detalle)
     try:
         await db.commit()

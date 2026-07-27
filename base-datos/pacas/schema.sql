@@ -31,11 +31,13 @@ CREATE TABLE IF NOT EXISTS pacas (
 -- cancelación es una línea nueva, mismo principio append-only. ON DELETE SET
 -- NULL en detalle_salida_id: al cancelarse (borrarse) el detalle_salida, el
 -- historial de sus pacas sigue existiendo, solo pierde el link al ya no
--- existente.
+-- existente. usuario_id: solo lo llena registrar_historial_paca_cancelacion
+-- (quién canceló) -- ALTA y VENTA no lo tocan, queda NULL.
 CREATE TABLE IF NOT EXISTS historial_pacas (
     id                SERIAL PRIMARY KEY,
     paca_id           INTEGER NOT NULL REFERENCES pacas(id) ON DELETE CASCADE,
     evento            VARCHAR(15) NOT NULL CHECK (evento IN ('ALTA', 'VENTA', 'CANCELACION')),
     detalle_salida_id INTEGER REFERENCES detalle_salida(id) ON DELETE SET NULL,
-    fecha             TIMESTAMPTZ NOT NULL DEFAULT now()
+    fecha             TIMESTAMPTZ NOT NULL DEFAULT now(),
+    usuario_id        INTEGER REFERENCES usuarios(id)
 );

@@ -10,6 +10,7 @@ class AjusteInventarioOut(BaseModel):
     motivo: str
     comentarios: str | None
     fecha: datetime
+    creado_por: int | None
 
     model_config = {"from_attributes": True}
 

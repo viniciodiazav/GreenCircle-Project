@@ -9,5 +9,6 @@ class HistorialKgOut(BaseModel):
     peso_anterior: float
     peso_nuevo: float
     fecha_cambio: datetime
+    usuario_id: int | None
 
     model_config = {"from_attributes": True}

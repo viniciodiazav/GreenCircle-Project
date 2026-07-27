@@ -3,10 +3,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.pagination import PaginaOut, Paginacion, parametros_paginacion
+from app.core.security import get_current_user
 from app.modules.historial_precios.schemas import HistorialPrecioOut
 from app.modules.historial_precios.service import listar_historial_precios
 
-router = APIRouter(prefix="/historial-precios", tags=["historial-precios"])
+router = APIRouter(
+    prefix="/historial-precios", tags=["historial-precios"], dependencies=[Depends(get_current_user)]
+)
 
 
 @router.get("", response_model=PaginaOut[HistorialPrecioOut])

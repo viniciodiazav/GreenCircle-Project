@@ -91,11 +91,17 @@ CREATE TRIGGER trg_historial_paca_venta
 -- ligada al detalle_salida que se está cancelando (OLD.detalle_salida_id --
 -- para cuando este trigger corre, NEW.detalle_salida_id ya es NULL). Nunca
 -- se borra el evento VENTA original: la cancelación es una línea nueva.
+-- usuario_id sale de current_setting('app.usuario_actual', true), seteado
+-- por el backend (SET LOCAL) antes del DELETE del detalle_salida que
+-- disparó esta cadena -- ver app.core.database.set_usuario_actual.
 CREATE OR REPLACE FUNCTION registrar_historial_paca_cancelacion()
 RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO historial_pacas (paca_id, evento, detalle_salida_id, fecha)
-    VALUES (NEW.id, 'CANCELACION', OLD.detalle_salida_id, now());
+    INSERT INTO historial_pacas (paca_id, evento, detalle_salida_id, fecha, usuario_id)
+    VALUES (
+        NEW.id, 'CANCELACION', OLD.detalle_salida_id, now(),
+        NULLIF(current_setting('app.usuario_actual', true), '')::INTEGER
+    );
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;

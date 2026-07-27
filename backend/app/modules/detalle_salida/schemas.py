@@ -12,6 +12,7 @@ class DetalleSalidaOut(BaseModel):
     fecha: datetime
     descripcion: str | None
     cantidad_pacas: int
+    creado_por: int | None
 
     model_config = {"from_attributes": True}
 

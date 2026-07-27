@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.pagination import PaginaOut, Paginacion, parametros_paginacion
+from app.core.security import UsuarioActual, get_current_user
 from app.modules.movimientos.schemas import MovimientoCreate, MovimientoOut, MovimientoPatch
 from app.modules.movimientos.service import (
     actualizar_movimiento,
@@ -13,7 +14,7 @@ from app.modules.movimientos.service import (
     listar_movimientos,
 )
 
-router = APIRouter(prefix="/movimientos", tags=["movimientos"])
+router = APIRouter(prefix="/movimientos", tags=["movimientos"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("", response_model=PaginaOut[MovimientoOut])
@@ -27,8 +28,12 @@ async def get_movimientos(
 
 
 @router.post("", response_model=MovimientoOut, status_code=status.HTTP_201_CREATED)
-async def post_movimiento(data: MovimientoCreate, db: AsyncSession = Depends(get_db)):
-    return await crear_movimiento(data, db)
+async def post_movimiento(
+    data: MovimientoCreate,
+    db: AsyncSession = Depends(get_db),
+    usuario: UsuarioActual = Depends(get_current_user),
+):
+    return await crear_movimiento(data, db, usuario.id)
 
 
 @router.get("/{movimiento_id}", response_model=MovimientoOut)

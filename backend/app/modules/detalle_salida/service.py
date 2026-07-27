@@ -2,6 +2,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.database import set_usuario_actual
 from app.core.pagination import Paginacion
 from app.modules.detalle_salida.models import DetalleSalida
 from app.modules.detalle_salida.schemas import DetalleSalidaCreate, DetalleSalidaPatch
@@ -55,7 +56,9 @@ async def listar_detalle_salida(
     return [(fila[0], fila[1]) for fila in result.all()], total or 0
 
 
-async def agregar_detalle_salida(data: DetalleSalidaCreate, db: AsyncSession) -> tuple[DetalleSalida, int]:
+async def agregar_detalle_salida(
+    data: DetalleSalidaCreate, db: AsyncSession, usuario_id: int
+) -> tuple[DetalleSalida, int]:
     movimiento: Movimiento = await get_movimiento_or_404(data.movimiento_id, db)
     validar_movimiento_para_detalle(movimiento, "SALIDA")
 
@@ -100,6 +103,7 @@ async def agregar_detalle_salida(data: DetalleSalidaCreate, db: AsyncSession) ->
         precio_venta=data.precio_venta,
         monto_total=data.monto_total,
         descripcion=data.descripcion,
+        creado_por=usuario_id,
     )
     db.add(detalle)
     await db.flush()
@@ -139,7 +143,7 @@ async def actualizar_detalle_salida(
     return detalle, cantidad
 
 
-async def cancelar_detalle_salida(detalle_id: int, db: AsyncSession) -> None:
+async def cancelar_detalle_salida(detalle_id: int, db: AsyncSession, usuario_id: int) -> None:
     """Cancela (borra) una venta capturada por error -- solo mientras el
     movimiento sigue abierto. Un trigger en BD libera las pacas vendidas
     (en_inventario = true, detalle_salida_id = NULL) antes de borrar la fila
@@ -154,5 +158,8 @@ async def cancelar_detalle_salida(detalle_id: int, db: AsyncSession) -> None:
             detail="El movimiento ya está cerrado, no se pueden cancelar sus detalles",
         )
 
+    # trg_liberar_pacas_al_cancelar_detalle_salida -> trg_historial_paca_cancelacion
+    # leen esto para anotar quién canceló en historial_pacas.
+    await set_usuario_actual(db, usuario_id)
     await db.delete(detalle)
     await db.commit()

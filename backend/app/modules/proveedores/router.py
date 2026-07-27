@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.pagination import PaginaOut, Paginacion, parametros_paginacion
+from app.core.security import get_current_user
 from app.modules.proveedores.schemas import ProveedorCreate, ProveedorOut, ProveedorPatch
 from app.modules.proveedores.service import (
     actualizar_proveedor,
@@ -11,7 +12,7 @@ from app.modules.proveedores.service import (
     listar_proveedores,
 )
 
-router = APIRouter(prefix="/proveedores", tags=["proveedores"])
+router = APIRouter(prefix="/proveedores", tags=["proveedores"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("", response_model=PaginaOut[ProveedorOut])

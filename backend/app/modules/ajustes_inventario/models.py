@@ -15,3 +15,4 @@ class AjusteInventario(Base):
     motivo: Mapped[str]
     comentarios: Mapped[str | None]
     fecha: Mapped[datetime] = mapped_column(server_default=func.now())
+    creado_por: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"))

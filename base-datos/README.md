@@ -122,6 +122,30 @@ fuera de este alcance. Tampoco se permite cambiar `proveedor_id`/`material_id`/
 `cliente_id`/`pacas` vía edición -- si la entidad o las pacas están mal, se
 cancela la línea y se crea una nueva.
 
+**Autenticación (agregado 2026-07-26): `admin` único → `usuarios` (varios,
+sin roles).** Decisión explícita del usuario: no quiere admin/operador,
+solo cuentas independientes con los mismos permisos -- la idea es saber
+*quién* hizo qué, no restringir *qué puede hacer* cada quien. `activo`
+permite dar de baja una cuenta sin borrarla (y sin romper los FKs de abajo).
+
+**Trazabilidad de creado_por / usuario_id.** `movimientos`, `detalle_entrada`,
+`detalle_salida` y `ajustes_inventario` tienen `creado_por` (FK a
+`usuarios`), llenado por el backend al crear -- nullable porque los
+registros previos a esta migración no tienen autor conocido.
+
+Para las **cancelaciones** (que hacen `DELETE`, no `UPDATE`), no hay fila
+que lleve un `cancelado_por` -- lo que existe es el rastro que ya dejaban
+los triggers en `historial_kg`/`historial_pacas`. Se les agregó `usuario_id`
+(nullable, mismo motivo) y los dos triggers de cancelación
+(`revertir_inventario_entrada_cancelada`, `registrar_historial_paca_cancelacion`)
+lo leen de `current_setting('app.usuario_actual', true)` -- un trigger de
+Postgres no recibe parámetros del backend, así que la app hace
+`SET LOCAL app.usuario_actual = '<id>'` justo antes del `DELETE` (misma
+transacción, se resetea solo al terminar). Ver `app.core.database.
+set_usuario_actual` del lado del backend. Los demás triggers que insertan en
+`historial_kg` (entrada normal, paca registrada, ajuste) no cambiaron -- ahí
+`usuario_id` queda `NULL`, solo se llena en la cancelación.
+
 ## Cómo agregar un módulo nuevo (ej. `camiones`)
 
 1. Crear `base-datos/camiones/` con `schema.sql` (+ `triggers.sql`/`seed.sql` si aplica).

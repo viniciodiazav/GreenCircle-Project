@@ -1,0 +1,49 @@
+# Levanta Postgres + backend para desarrollo local.
+#
+#   docker compose up --build
+#
+# La primera vez, aplica el seed del admin a mano (las migraciones crean las
+# tablas pero no insertan datos -- ver base-datos/README.md):
+#
+#   docker compose exec db psql -U dev -d greencircle_db -c "
+#     INSERT INTO usuarios (usuario, password_hash) VALUES
+#       ('admin', '\$2b\$12\$jDhG73fiTXT9i9qy90fJ7e/Ykno7epPg3dVpb1sZhS9VxXhzV4oae')
+#     ON CONFLICT (usuario) DO NOTHING;
+#   "
+#
+# app-movil NO está incluido aquí -- tiene su propio repo (ver .gitignore) y
+# corre con Expo, no con Docker.
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: CHANGE_ME
+      POSTGRES_DB: greencircle_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dev -d greencircle_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://dev:CHANGE_ME@db:5432/greencircle_db
+      JWT_SECRET: CHANGE_ME_TO_A_LONG_RANDOM_STRING
+      JWT_EXPIRE_MINUTES: "480"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+
+volumes:
+  db_data:

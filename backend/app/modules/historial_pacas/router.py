@@ -3,10 +3,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.pagination import PaginaOut, Paginacion, parametros_paginacion
+from app.core.security import get_current_user
 from app.modules.historial_pacas.schemas import HistorialPacaOut
 from app.modules.historial_pacas.service import listar_historial_pacas
 
-router = APIRouter(prefix="/historial-pacas", tags=["historial-pacas"])
+router = APIRouter(
+    prefix="/historial-pacas", tags=["historial-pacas"], dependencies=[Depends(get_current_user)]
+)
 
 
 @router.get("", response_model=PaginaOut[HistorialPacaOut])

@@ -30,3 +30,4 @@ class DetalleEntrada(Base):
     fecha: Mapped[datetime] = mapped_column(server_default=func.now())
     descripcion: Mapped[str | None]
     descripcion_descuento: Mapped[str | None]
+    creado_por: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"))

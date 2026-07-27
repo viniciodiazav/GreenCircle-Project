@@ -12,6 +12,9 @@ CREATE TABLE IF NOT EXISTS movimientos (
     fecha       TIMESTAMPTZ NOT NULL DEFAULT now(),
     cerrado     BOOLEAN NOT NULL DEFAULT false,
     descripcion TEXT,
+    -- Nullable: registros creados antes de que la autenticación existiera no
+    -- tienen autor conocido.
+    creado_por  INTEGER REFERENCES usuarios(id),
     UNIQUE (id, tipo)
 );
 
@@ -34,6 +37,7 @@ CREATE TABLE IF NOT EXISTS detalle_entrada (
     fecha           TIMESTAMPTZ NOT NULL DEFAULT now(),
     descripcion     TEXT,
     descripcion_descuento TEXT,
+    creado_por      INTEGER REFERENCES usuarios(id),
     CHECK (peso_bruto > tara),
     FOREIGN KEY (movimiento_id, tipo_movimiento) REFERENCES movimientos (id, tipo)
 );
@@ -47,6 +51,7 @@ CREATE TABLE IF NOT EXISTS detalle_salida (
     monto_total     NUMERIC(10, 2) NOT NULL CHECK (monto_total >= 0),
     fecha           TIMESTAMPTZ NOT NULL DEFAULT now(),
     descripcion     TEXT,
+    creado_por      INTEGER REFERENCES usuarios(id),
     FOREIGN KEY (movimiento_id, tipo_movimiento) REFERENCES movimientos (id, tipo)
 );
 

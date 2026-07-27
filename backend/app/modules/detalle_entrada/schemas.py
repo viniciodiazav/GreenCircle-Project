@@ -17,6 +17,7 @@ class DetalleEntradaOut(BaseModel):
     fecha: datetime
     descripcion: str | None
     descripcion_descuento: str | None
+    creado_por: int | None
 
     model_config = {"from_attributes": True}
 

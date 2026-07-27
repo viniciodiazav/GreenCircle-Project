@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.pagination import PaginaOut, Paginacion, parametros_paginacion
+from app.core.security import get_current_user
 from app.modules.clientes.schemas import ClienteCreate, ClienteOut, ClientePatch
 from app.modules.clientes.service import (
     actualizar_cliente,
@@ -11,7 +12,7 @@ from app.modules.clientes.service import (
     listar_clientes,
 )
 
-router = APIRouter(prefix="/clientes", tags=["clientes"])
+router = APIRouter(prefix="/clientes", tags=["clientes"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("", response_model=PaginaOut[ClienteOut])
