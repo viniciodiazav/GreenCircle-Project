@@ -15,6 +15,7 @@ bearer_scheme = HTTPBearer(auto_error=False)
 class UsuarioActual:
     id: int
     usuario: str
+    rol: str
 
 
 def hash_password(plain_password: str) -> str:
@@ -25,9 +26,9 @@ def verify_password(plain_password: str, password_hash: str) -> bool:
     return bcrypt.checkpw(plain_password.encode(), password_hash.encode())
 
 
-def create_access_token(subject: str, usuario_id: int) -> str:
+def create_access_token(subject: str, usuario_id: int, rol: str) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expire_minutes)
-    payload = {"sub": subject, "uid": usuario_id, "exp": expire}
+    payload = {"sub": subject, "uid": usuario_id, "rol": rol, "exp": expire}
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
@@ -50,6 +51,19 @@ def get_current_user(
 
     usuario = payload.get("sub")
     usuario_id = payload.get("uid")
-    if usuario is None or usuario_id is None:
+    rol = payload.get("rol")
+    if usuario is None or usuario_id is None or rol is None:
         raise unauthorized
-    return UsuarioActual(id=usuario_id, usuario=usuario)
+    return UsuarioActual(id=usuario_id, usuario=usuario, rol=rol)
+
+
+def require_admin(usuario: UsuarioActual = Depends(get_current_user)) -> UsuarioActual:
+    """Para endpoints exclusivos de administrador (precios, catálogos,
+    ajustes de inventario, gestión de usuarios -- ver
+    ../../base-datos/README.md para la tabla completa de permisos)."""
+    if usuario.rol != "administrador":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Se requiere rol de administrador",
+        )
+    return usuario

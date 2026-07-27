@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.pagination import PaginaOut, Paginacion, parametros_paginacion
-from app.core.security import UsuarioActual, get_current_user
+from app.core.security import UsuarioActual, require_admin
 from app.modules.auth.schemas import (
     LoginRequest,
     TokenResponse,
@@ -22,11 +22,11 @@ from app.modules.auth.service import (
 # /auth: login público (único endpoint sin auth de todo el backend).
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-# /usuarios: gestión de cuentas -- requiere sesión, pero sin roles (ver
-# ../../../base-datos/README.md): cualquier cuenta autenticada puede crear o
-# dar de baja a cualquier otra, decisión explícita del usuario.
+# /usuarios: exclusivo de administrador (ver ../../../base-datos/README.md
+# para la tabla completa de permisos por rol) -- un operador ni siquiera ve
+# quién más tiene cuenta.
 usuarios_router = APIRouter(
-    prefix="/usuarios", tags=["usuarios"], dependencies=[Depends(get_current_user)]
+    prefix="/usuarios", tags=["usuarios"], dependencies=[Depends(require_admin)]
 )
 
 
@@ -48,7 +48,7 @@ async def get_usuarios(
 async def post_usuario(
     data: UsuarioCreate,
     db: AsyncSession = Depends(get_db),
-    actor: UsuarioActual = Depends(get_current_user),
+    actor: UsuarioActual = Depends(require_admin),
 ):
     return await crear_usuario(data, db, actor)
 
@@ -63,6 +63,6 @@ async def patch_usuario(
     usuario_id: int,
     data: UsuarioPatch,
     db: AsyncSession = Depends(get_db),
-    actor: UsuarioActual = Depends(get_current_user),
+    actor: UsuarioActual = Depends(require_admin),
 ):
     return await actualizar_usuario(usuario_id, data, db, actor)

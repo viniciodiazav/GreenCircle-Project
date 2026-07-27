@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.pagination import PaginaOut, Paginacion, parametros_paginacion
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_admin
 from app.modules.clientes.schemas import ClienteCreate, ClienteOut, ClientePatch
 from app.modules.clientes.service import (
     actualizar_cliente,
@@ -12,6 +12,8 @@ from app.modules.clientes.service import (
     listar_clientes,
 )
 
+# Ver es de cualquier usuario logueado; alta/baja (crear, activo, editar)
+# es exclusivo de administrador -- ver ../../../base-datos/README.md.
 router = APIRouter(prefix="/clientes", tags=["clientes"], dependencies=[Depends(get_current_user)])
 
 
@@ -25,7 +27,10 @@ async def get_clientes(
     return PaginaOut(items=clientes, total=total, limit=paginacion.limit, offset=paginacion.offset)
 
 
-@router.post("", response_model=ClienteOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "", response_model=ClienteOut, status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_admin)],
+)
 async def post_cliente(data: ClienteCreate, db: AsyncSession = Depends(get_db)):
     return await crear_cliente(data, db)
 
@@ -35,6 +40,8 @@ async def get_cliente(cliente_id: int, db: AsyncSession = Depends(get_db)):
     return await get_cliente_or_404(cliente_id, db)
 
 
-@router.patch("/{cliente_id}", response_model=ClienteOut)
+@router.patch(
+    "/{cliente_id}", response_model=ClienteOut, dependencies=[Depends(require_admin)]
+)
 async def patch_cliente(cliente_id: int, data: ClientePatch, db: AsyncSession = Depends(get_db)):
     return await actualizar_cliente(cliente_id, data, db)

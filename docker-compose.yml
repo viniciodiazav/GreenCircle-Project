@@ -2,14 +2,12 @@
 #
 #   docker compose up --build
 #
-# La primera vez, aplica el seed del admin a mano (las migraciones crean las
-# tablas pero no insertan datos -- ver base-datos/README.md):
+# La primera vez, aplica el seed de usuarios a mano (las migraciones crean
+# las tablas pero no insertan datos -- ver base-datos/README.md y
+# base-datos/auth/seed.sql para el contenido completo, admin/op1/op2 con
+# contraseña "pass1234", solo para desarrollo local):
 #
-#   docker compose exec db psql -U dev -d greencircle_db -c "
-#     INSERT INTO usuarios (usuario, password_hash) VALUES
-#       ('admin', '\$2b\$12\$jDhG73fiTXT9i9qy90fJ7e/Ykno7epPg3dVpb1sZhS9VxXhzV4oae')
-#     ON CONFLICT (usuario) DO NOTHING;
-#   "
+#   docker compose exec db psql -U dev -d greencircle_db -f /dev/stdin < base-datos/auth/seed.sql
 #
 # app-movil NO está incluido aquí -- tiene su propio repo (ver .gitignore) y
 # corre con Expo, no con Docker.

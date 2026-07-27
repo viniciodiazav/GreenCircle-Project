@@ -10,3 +10,4 @@ class Usuario(Base):
     usuario: Mapped[str] = mapped_column(unique=True)
     password_hash: Mapped[str]
     activo: Mapped[bool] = mapped_column(default=True)
+    rol: Mapped[str] = mapped_column(default="operador")

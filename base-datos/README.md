@@ -122,11 +122,29 @@ fuera de este alcance. Tampoco se permite cambiar `proveedor_id`/`material_id`/
 `cliente_id`/`pacas` vía edición -- si la entidad o las pacas están mal, se
 cancela la línea y se crea una nueva.
 
-**Autenticación (agregado 2026-07-26): `admin` único → `usuarios` (varios,
-sin roles).** Decisión explícita del usuario: no quiere admin/operador,
-solo cuentas independientes con los mismos permisos -- la idea es saber
-*quién* hizo qué, no restringir *qué puede hacer* cada quien. `activo`
-permite dar de baja una cuenta sin borrarla (y sin romper los FKs de abajo).
+**Autenticación (agregado 2026-07-26): `admin` único → `usuarios` (varios).**
+`activo` permite dar de baja una cuenta sin borrarla (y sin romper los FKs
+de abajo).
+
+**Roles (agregado 2026-07-27): `rol` en `usuarios`, `operador` o
+`administrador` (default `operador`).** Revierte la decisión original del
+mismo día 26 ("sin roles") -- el usuario cambió de opinión porque quiere una
+UI distinta por rol en el frontend de escritorio. El rol viaja en el JWT
+(claim `rol`) y el backend lo aplica de verdad, no solo la UI: ver
+`require_admin` en `backend/app/core/security.py`.
+
+Tabla de permisos (todo lo que no aparece aquí es común a ambos roles --
+ver, crear, editar y cerrar/cancelar movimientos/detalles/pacas):
+
+| Acción | Operador | Administrador |
+|---|---|---|
+| Crear/editar materiales (incluye precio y activo) | ❌ | ✅ |
+| Alta/baja de proveedor o cliente | ❌ | ✅ |
+| Ajustes de inventario | ❌ | ✅ |
+| Gestión de usuarios (ver/crear/desactivar/cambiar rol) | ❌ | ✅ |
+
+El usuario `admin` sembrado en `seed.sql` es `administrador`; cualquier
+usuario nuevo nace `operador` salvo que se cree explícitamente con otro rol.
 
 **Trazabilidad de creado_por / usuario_id.** `movimientos`, `detalle_entrada`,
 `detalle_salida` y `ajustes_inventario` tienen `creado_por` (FK a

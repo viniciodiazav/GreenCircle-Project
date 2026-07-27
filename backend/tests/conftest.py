@@ -36,10 +36,23 @@ async def db_session():
 
 @pytest_asyncio.fixture
 async def usuario_test(db_session):
-    """Usuario autenticado por defecto en `client` -- casi todos los
-    endpoints requieren Bearer token desde 2026-07-26 (ver app.core.security)."""
+    """Usuario autenticado por defecto en `client` -- rol administrador para
+    no tener que marcar cada test existente con permisos de admin (la
+    mayoría de la suite predata los roles). Para probar restricciones de
+    operador, usar `client_operador`."""
     password_hash = bcrypt.hashpw(b"clave-prueba", bcrypt.gensalt()).decode()
-    usuario = Usuario(usuario="usuario_prueba", password_hash=password_hash)
+    usuario = Usuario(usuario="usuario_prueba", password_hash=password_hash, rol="administrador")
+    db_session.add(usuario)
+    await db_session.flush()
+    return usuario
+
+
+@pytest_asyncio.fixture
+async def usuario_operador_test(db_session):
+    password_hash = bcrypt.hashpw(b"clave-prueba-operador", bcrypt.gensalt()).decode()
+    usuario = Usuario(
+        usuario="usuario_prueba_operador", password_hash=password_hash, rol="operador"
+    )
     db_session.add(usuario)
     await db_session.flush()
     return usuario
@@ -51,7 +64,33 @@ async def client(db_session, usuario_test):
         yield db_session
 
     app.dependency_overrides[get_db] = _override_get_db
-    token = create_access_token(subject=usuario_test.usuario, usuario_id=usuario_test.id)
+    token = create_access_token(
+        subject=usuario_test.usuario, usuario_id=usuario_test.id, rol=usuario_test.rol
+    )
+    transport = ASGITransport(app=app)
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://test",
+        headers={"Authorization": f"Bearer {token}"},
+    ) as ac:
+        yield ac
+    app.dependency_overrides.pop(get_db, None)
+
+
+@pytest_asyncio.fixture
+async def client_operador(db_session, usuario_operador_test):
+    """Mismo cliente pero autenticado como operador -- para probar que los
+    endpoints admin-only lo rechazan (403) y que el resto del flujo diario
+    (movimientos, detalles, pacas) sí le funciona."""
+    async def _override_get_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = _override_get_db
+    token = create_access_token(
+        subject=usuario_operador_test.usuario,
+        usuario_id=usuario_operador_test.id,
+        rol=usuario_operador_test.rol,
+    )
     transport = ASGITransport(app=app)
     async with AsyncClient(
         transport=transport,

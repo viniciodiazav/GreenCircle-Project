@@ -55,8 +55,8 @@ async def autenticar_usuario(usuario: str, password: str, db: AsyncSession) -> s
         )
 
     _INTENTOS_FALLIDOS.pop(usuario, None)
-    logger.info("Login exitoso: usuario=%r id=%s", fila.usuario, fila.id)
-    return create_access_token(subject=fila.usuario, usuario_id=fila.id)
+    logger.info("Login exitoso: usuario=%r id=%s rol=%s", fila.usuario, fila.id, fila.rol)
+    return create_access_token(subject=fila.usuario, usuario_id=fila.id, rol=fila.rol)
 
 
 async def listar_usuarios(db: AsyncSession, paginacion: Paginacion) -> tuple[list[Usuario], int]:
@@ -65,7 +65,9 @@ async def listar_usuarios(db: AsyncSession, paginacion: Paginacion) -> tuple[lis
 
 
 async def crear_usuario(data: UsuarioCreate, db: AsyncSession, actor: UsuarioActual) -> Usuario:
-    usuario = Usuario(usuario=data.usuario, password_hash=hash_password(data.password))
+    usuario = Usuario(
+        usuario=data.usuario, password_hash=hash_password(data.password), rol=data.rol
+    )
     db.add(usuario)
     try:
         await db.commit()
@@ -74,8 +76,8 @@ async def crear_usuario(data: UsuarioCreate, db: AsyncSession, actor: UsuarioAct
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ese usuario ya existe")
     await db.refresh(usuario)
     logger.info(
-        "Usuario creado: usuario=%r id=%s por actor=%r id=%s",
-        usuario.usuario, usuario.id, actor.usuario, actor.id,
+        "Usuario creado: usuario=%r id=%s rol=%s por actor=%r id=%s",
+        usuario.usuario, usuario.id, usuario.rol, actor.usuario, actor.id,
     )
     return usuario
 
@@ -90,10 +92,10 @@ async def get_usuario_or_404(usuario_id: int, db: AsyncSession) -> Usuario:
 async def actualizar_usuario(
     usuario_id: int, data: UsuarioPatch, db: AsyncSession, actor: UsuarioActual
 ) -> Usuario:
-    if data.activo is None and data.password is None:
+    if data.activo is None and data.password is None and data.rol is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Debes enviar activo y/o password",
+            detail="Debes enviar activo, password y/o rol",
         )
     usuario = await get_usuario_or_404(usuario_id, db)
     if data.activo is not None:
@@ -107,6 +109,12 @@ async def actualizar_usuario(
         logger.info(
             "Password cambiado: usuario=%r id=%s por actor=%r id=%s",
             usuario.usuario, usuario.id, actor.usuario, actor.id,
+        )
+    if data.rol is not None:
+        usuario.rol = data.rol
+        logger.info(
+            "Usuario %r id=%s rol=%s por actor=%r id=%s",
+            usuario.usuario, usuario.id, data.rol, actor.usuario, actor.id,
         )
     await db.commit()
     await db.refresh(usuario)

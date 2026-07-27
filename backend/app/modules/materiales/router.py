@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.pagination import PaginaOut, Paginacion, parametros_paginacion
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_admin
 from app.modules.materiales.schemas import (
     MaterialCreate,
     MaterialOut,
@@ -18,9 +18,9 @@ from app.modules.materiales.service import (
 
 # GET "" (público) es intencional: es el listado de precios que ve cualquiera
 # en la app móvil sin loguearse (ver app-movil/src/screens/HomeScreen.tsx).
-# Todo lo demás (admin, alta, edición) requiere sesión -- se protege endpoint
-# por endpoint en vez de a nivel de router porque este es el único módulo con
-# una ruta pública mezclada con rutas de admin.
+# GET /admin* es de cualquier usuario logueado (operador lo necesita para
+# elegir material_id al capturar detalles). Crear/editar (incluye precio y
+# activo) es exclusivo de administrador -- ver ../../../base-datos/README.md.
 router = APIRouter(prefix="/materiales", tags=["materiales"])
 
 
@@ -55,14 +55,14 @@ async def get_materiales_admin_activos(
     "",
     response_model=MaterialOut,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(get_current_user)],
+    dependencies=[Depends(require_admin)],
 )
 async def post_material(data: MaterialCreate, db: AsyncSession = Depends(get_db)):
     return await crear_material(data, db)
 
 
 @router.patch(
-    "/{material_id}", response_model=MaterialOut, dependencies=[Depends(get_current_user)]
+    "/{material_id}", response_model=MaterialOut, dependencies=[Depends(require_admin)]
 )
 async def patch_material(
     material_id: int, data: MaterialPatch, db: AsyncSession = Depends(get_db)

@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.pagination import PaginaOut, Paginacion, parametros_paginacion
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_admin
 from app.modules.proveedores.schemas import ProveedorCreate, ProveedorOut, ProveedorPatch
 from app.modules.proveedores.service import (
     actualizar_proveedor,
@@ -12,6 +12,8 @@ from app.modules.proveedores.service import (
     listar_proveedores,
 )
 
+# Ver es de cualquier usuario logueado; alta/baja (crear, activo, editar)
+# es exclusivo de administrador -- ver ../../../base-datos/README.md.
 router = APIRouter(prefix="/proveedores", tags=["proveedores"], dependencies=[Depends(get_current_user)])
 
 
@@ -25,7 +27,10 @@ async def get_proveedores(
     return PaginaOut(items=proveedores, total=total, limit=paginacion.limit, offset=paginacion.offset)
 
 
-@router.post("", response_model=ProveedorOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "", response_model=ProveedorOut, status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_admin)],
+)
 async def post_proveedor(data: ProveedorCreate, db: AsyncSession = Depends(get_db)):
     return await crear_proveedor(data, db)
 
@@ -35,7 +40,9 @@ async def get_proveedor(proveedor_id: int, db: AsyncSession = Depends(get_db)):
     return await get_proveedor_or_404(proveedor_id, db)
 
 
-@router.patch("/{proveedor_id}", response_model=ProveedorOut)
+@router.patch(
+    "/{proveedor_id}", response_model=ProveedorOut, dependencies=[Depends(require_admin)]
+)
 async def patch_proveedor(
     proveedor_id: int, data: ProveedorPatch, db: AsyncSession = Depends(get_db)
 ):
